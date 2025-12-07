@@ -28,9 +28,22 @@ type VaultSecretSpec struct {
 	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
 
+  // Immutable, if set to true, ensures that data stored in the Secret cannot be
+  // updated (only object metadata can be modified). If not set to true, the
+  // field can be modified at any time. Defaulted to nil.
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default:=false
+	Immutable    bool              `json:"immutable,omitempty"`
 	// StringData is an example field of VaultSecret. Edit vaultsecret_types.go to remove/update
 	// +kubebuilder:validation:Required
-	StringData map[string]string `json:"stringData"`
+	StringData   map[string]string `json:"stringData"`
+	// stringData allows specifying non-binary secret data in string form. It is
+  // provided as a write-only input field for convenience. All keys and values
+  // are merged into the data field on write, overwriting any existing values.
+  // The stringData field is never output when reading from the API.
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default:=Opaque
+	Type 		     string            `json:"type,omitempty"`
 }
 
 // VaultSecretStatus defines the observed state of VaultSecret.
