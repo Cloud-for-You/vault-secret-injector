@@ -37,8 +37,11 @@ import (
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
+	k8siov1 "k8s.io/api/core/v1"
+
 	cfyczv1 "github.com/cloud-for-you/vault-secret-injector/api/v1"
 	"github.com/cloud-for-you/vault-secret-injector/internal/controller"
+	webhookv1 "github.com/cloud-for-you/vault-secret-injector/internal/webhook/v1"
 	// +kubebuilder:scaffold:imports
 )
 
@@ -51,6 +54,7 @@ func init() {
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
 
 	utilruntime.Must(cfyczv1.AddToScheme(scheme))
+	utilruntime.Must(k8siov1.AddToScheme(scheme))
 	// +kubebuilder:scaffold:scheme
 }
 
@@ -208,6 +212,13 @@ func main() {
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "VaultSecret")
 		os.Exit(1)
+	}
+	// nolint:goconst
+	if os.Getenv("ENABLE_WEBHOOKS") != "false" {
+		if err := webhookv1.SetupNamespaceWebhookWithManager(mgr); err != nil {
+			setupLog.Error(err, "unable to create webhook", "webhook", "Namespace")
+			os.Exit(1)
+		}
 	}
 	// +kubebuilder:scaffold:builder
 
