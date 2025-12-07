@@ -1,8 +1,19 @@
 # vault-secret-injector
-// TODO(user): Add simple overview of use/purpose
 
 ## Description
-// TODO(user): An in-depth paragraph about your project and overview of use
+vault-secret-injector je Kubernetes operator vytvořený pomocí operator-sdk a kubebuilder, který spravuje VaultSecret vlastní zdroje. Umožňuje injektovat tajné údaje z HashiCorp Vault do Kubernetes Secrets. Operator obsahuje validační webhook, který kontroluje vytváření Namespace, zajišťujíc, že mohou být vytvořeny pouze Namespaces s označením `vault-injection=enabled`.
+
+### Příklad VaultSecret CRD
+
+```yaml
+apiVersion: cfy.cz/v1
+kind: VaultSecret
+metadata:
+  name: vaultsecret-sample
+spec:
+  stringData:
+    secret-key: secret/data/myapp/config#password
+```
 
 ## Getting Started
 
