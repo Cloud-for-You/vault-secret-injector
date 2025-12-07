@@ -28,18 +28,21 @@ type VaultSecretSpec struct {
 	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
 
-	// Foo is an example field of VaultSecret. Edit vaultsecret_types.go to remove/update
-	Foo string `json:"foo,omitempty"`
+	// StringData is an example field of VaultSecret. Edit vaultsecret_types.go to remove/update
+	StringData map[string]string `json:"stringData,omitempty"`
 }
 
 // VaultSecretStatus defines the observed state of VaultSecret.
 type VaultSecretStatus struct {
 	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
+	SecretName string `json:"secretName,omitempty"`
 }
 
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
+// +kubebuilder:printcolumn:name="Secret",type=string,JSONPath=`.status.secretName`
+// +kubebuilder:printcolumn:name="Age",type=date,JSONPath=`.metadata.creationTimestamp`
 
 // VaultSecret is the Schema for the vaultsecrets API.
 type VaultSecret struct {
