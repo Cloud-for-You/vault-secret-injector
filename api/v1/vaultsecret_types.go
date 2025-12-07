@@ -29,7 +29,8 @@ type VaultSecretSpec struct {
 	// Important: Run "make" to regenerate code after modifying this file
 
 	// StringData is an example field of VaultSecret. Edit vaultsecret_types.go to remove/update
-	StringData map[string]string `json:"stringData,omitempty"`
+	// +kubebuilder:validation:Required
+	StringData map[string]string `json:"stringData"`
 }
 
 // VaultSecretStatus defines the observed state of VaultSecret.
