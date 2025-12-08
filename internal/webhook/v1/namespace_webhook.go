@@ -44,7 +44,7 @@ func SetupNamespaceWebhookWithManager(mgr ctrl.Manager) error {
 // TODO(user): change verbs to "verbs=create;update;delete" if you want to enable deletion validation.
 // NOTE: The 'path' attribute must follow a specific pattern and should not be modified directly here.
 // Modifying the path for an invalid path can cause API server errors; failing to locate the webhook.
-// +kubebuilder:webhook:path=/validate-k8s-io-v1-namespace,mutating=false,failurePolicy=fail,sideEffects=None,groups=k8s.io,resources=namespaces,verbs=create;update,versions=v1,name=vnamespace-v1.kb.io,admissionReviewVersions=v1
+// +kubebuilder:webhook:path=/validate--v1-namespace,mutating=false,failurePolicy=fail,sideEffects=None,groups="",resources=namespaces,verbs=create;update,versions=v1,name=vnamespace-v1.kb.io,admissionReviewVersions=v1
 
 // NamespaceCustomValidator struct is responsible for validating the Namespace resource
 // when it is created, updated, or deleted.
