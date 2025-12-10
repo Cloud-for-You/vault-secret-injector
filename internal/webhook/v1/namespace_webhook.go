@@ -19,6 +19,8 @@ package v1
 import (
 	"context"
 	"fmt"
+	"os"
+	"time"
 
 	k8siov1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -26,11 +28,17 @@ import (
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
+
+	"github.com/hashicorp/vault-client-go"
+	"github.com/hashicorp/vault-client-go/schema"
 )
 
 // nolint:unused
 // log is for logging in this package.
 var namespacelog = logf.Log.WithName("namespace-resource")
+
+var vaultClient *vault.Client
+var err error
 
 // SetupNamespaceWebhookWithManager registers the webhook for Namespace in the manager.
 func SetupNamespaceWebhookWithManager(mgr ctrl.Manager) error {
@@ -69,6 +77,41 @@ func (v *NamespaceCustomValidator) ValidateCreate(_ context.Context, obj runtime
 	if namespace.Labels == nil || namespace.Labels["vault-injection"] != "enabled" {
 		return nil, fmt.Errorf("namespace %s must have label 'vault-injection=enabled' to be created", namespace.GetName())
 	}
+
+  ctx := context.Background()
+
+	vaultClient, err = vault.New(
+		vault.WithAddress(os.Getenv("VAULT_ADDR")),
+		vault.WithRequestTimeout(30 * time.Second),
+	)
+	if err != nil {
+		namespacelog.Error(err, "Failed to initialize Vault client")
+		return nil, err
+	}
+
+	// read JWT token for ServiceAccount
+  jwt, err := os.ReadFile("/var/run/secrets/kubernetes.io/serviceaccount/token")
+  if err != nil {
+		namespacelog.Error(err, "Failed to read ServiceAccount JWT token")
+    return nil, err
+  }
+
+	resp, err := vaultClient.Auth.AppRoleLogin(
+	  ctx,
+	  schema.AppRoleLoginRequest{
+		  RoleId:   os.Getenv("VAULT_ROLE_ID"),
+		  SecretId: string(jwt),
+	  },
+	  vault.WithMountPath("my/approle/path"), // optional, defaults to "approle"
+  )
+  if err != nil {
+		namespacelog.Error(err, "Failed to authenticate with Vault")
+		return nil, err
+  }
+	if err := vaultClient.SetToken(resp.Auth.ClientToken); err != nil {
+		namespacelog.Error(err, "Failed to set Vault token")
+		return nil, err
+  }
 
 	return nil, nil
 }
