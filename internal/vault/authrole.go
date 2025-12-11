@@ -25,3 +25,15 @@ func CreateVaultKubernetesAuthRole(ctx *k8siov1.Namespace, client *vaultapi.Clie
 
 	return nil
 }
+
+func DeleteVaultKubernetesAuthRole(ctx *k8siov1.Namespace, client *vaultapi.Client, mount string) error {
+	roleName := ctx.GetName()
+
+	path := fmt.Sprintf("auth/%s/role/%s", mount, roleName)
+	_, err := client.Logical().Delete(path)
+	if err != nil {
+		return fmt.Errorf("failed to delete Vault role %s: %w", roleName, err)
+	}
+
+	return nil
+}

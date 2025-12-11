@@ -11,9 +11,10 @@ var auditlog = logf.Log.WithName("audit")
 
 // AuditEntry represents an audit log entry
 type AuditEntry struct {
-	Who  string    `json:"who"`
-	When time.Time `json:"when"`
-	What string    `json:"what"`
+	Who     string                 `json:"who"`
+	When    time.Time              `json:"when"`
+	What    string                 `json:"what"`
+	Context map[string]interface{} `json:"context,omitempty"`
 }
 
 // parseJWT extracts the subject (who) from a JWT token without verification
@@ -33,7 +34,7 @@ func parseJWT(tokenString string) (string, error) {
 }
 
 // LogAudit logs an audit entry in structured format
-func LogAudit(jwtToken []byte, action string) {
+func LogAudit(jwtToken []byte, action string, context map[string]interface{}) {
 	who, err := parseJWT(string(jwtToken))
 	if err != nil {
 		auditlog.Error(err, "Failed to parse JWT for audit")
@@ -42,5 +43,5 @@ func LogAudit(jwtToken []byte, action string) {
 
 	when := time.Now()
 
-	auditlog.Info(action, "user", who, "timestamp", when.Format(time.RFC3339))
+	auditlog.Info(action, "user", who, "timestamp", when.Format(time.RFC3339), "context", context)
 }

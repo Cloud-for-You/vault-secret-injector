@@ -20,3 +20,14 @@ path "secret/data/%s/*" { capabilities = ["read","list"] }
 
 	return nil
 }
+
+func DeleteVaultPolicy(ctx *k8siov1.Namespace, client *vaultapi.Client) error {
+	policyName := fmt.Sprintf("%s-policy", ctx.GetName())
+
+	err := client.Sys().DeletePolicy(policyName)
+	if err != nil {
+		return fmt.Errorf("failed to delete policy %s: %w", policyName, err)
+	}
+
+	return nil
+}

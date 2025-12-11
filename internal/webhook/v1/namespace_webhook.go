@@ -44,10 +44,9 @@ func SetupNamespaceWebhookWithManager(mgr ctrl.Manager) error {
 
 // TODO(user): EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
 
-// TODO(user): change verbs to "verbs=create;update;delete" if you want to enable deletion validation.
 // NOTE: The 'path' attribute must follow a specific pattern and should not be modified directly here.
 // Modifying the path for an invalid path can cause API server errors; failing to locate the webhook.
-// +kubebuilder:webhook:path=/validate--v1-namespace,mutating=false,failurePolicy=fail,sideEffects=None,groups="",resources=namespaces,verbs=create;update,versions=v1,name=vnamespace-v1.kb.io,admissionReviewVersions=v1
+// +kubebuilder:webhook:path=/validate--v1-namespace,mutating=false,failurePolicy=fail,sideEffects=None,groups="",resources=namespaces,verbs=create;update;delete,versions=v1,name=vnamespace-v1.kb.io,admissionReviewVersions=v1
 
 // NamespaceCustomValidator struct is responsible for validating the Namespace resource
 // when it is created, updated, or deleted.
@@ -67,11 +66,6 @@ func (v *NamespaceCustomValidator) ValidateCreate(ctx context.Context, obj runti
 		return nil, fmt.Errorf("expected a Namespace object but got %T", obj)
 	}
 	namespacelog.Info("Validation for Namespace upon creation", "name", namespace.GetName())
-
-	// Validation logic: Check if namespace has label "vault-injection" set to "enabled"
-	if namespace.Labels == nil || namespace.Labels["vault-injection"] != "enabled" {
-		return nil, fmt.Errorf("namespace %s must have label 'vault-injection=enabled' to be created", namespace.GetName())
-	}
 
   jwt, err := os.ReadFile("/var/run/secrets/kubernetes.io/serviceaccount/token")
   if err != nil {
@@ -95,21 +89,30 @@ func (v *NamespaceCustomValidator) ValidateCreate(ctx context.Context, obj runti
 		namespacelog.Error(err, "Failed to login to Vault")
 		return nil, err
 	}
-	vaultlib.LogAudit(jwt, "Vault login with Kubernetes auth")
+	vaultlib.LogAudit(jwt, "Vault login with Kubernetes auth", map[string]interface{}{})
 
 	err = vaultlib.CreateVaultPolicy(namespace, vaultClient)
 	if err != nil {
 		namespacelog.Error(err, "Failed to create Vault policy")
 		return nil, err
 	}
-	vaultlib.LogAudit(jwt, "Created Vault policy")
+	policyName := fmt.Sprintf("%s-policy", namespace.GetName())
+	policyRules := fmt.Sprintf(`path "secret/data/%s/*" { capabilities = ["read","list"] }`, namespace.GetName())
+	vaultlib.LogAudit(jwt, "Created Vault policy", map[string]interface{}{"policyName": policyName, "policyRules": policyRules})
 
 	err = vaultlib.CreateVaultKubernetesAuthRole(namespace, vaultClient, mount)
 	if err != nil {
 		namespacelog.Error(err, "Failed to create Vault Kubernetes auth role")
 		return nil, err
 	}
-	vaultlib.LogAudit(jwt, "Created Vault Kubernetes auth role")
+	roleName := namespace.GetName()
+	policyName = fmt.Sprintf("%s-policy", namespace.GetName())
+	roleData := map[string]interface{}{
+		"bound_service_account_names":      []string{"*"},
+		"bound_service_account_namespaces": []string{namespace.GetName()},
+		"policies":                         []string{policyName},
+	}
+	vaultlib.LogAudit(jwt, "Created Vault Kubernetes auth role", map[string]interface{}{"roleName": roleName, "roleData": roleData})
 
 	return nil, nil
 }
@@ -135,7 +138,45 @@ func (v *NamespaceCustomValidator) ValidateDelete(ctx context.Context, obj runti
 	}
 	namespacelog.Info("Validation for Namespace upon deletion", "name", namespace.GetName())
 
-	// TODO(user): fill in your validation logic upon object deletion.
+	jwt, err := os.ReadFile("/var/run/secrets/kubernetes.io/serviceaccount/token")
+	if err != nil {
+		namespacelog.Error(err, "Failed to read ServiceAccount JWT token")
+		return nil, err
+	}
+	role := os.Getenv("VAULT_ROLE")
+	mount := os.Getenv("VAULT_K8S_AUTH_MOUNT")
+	if mount == "" {
+		mount = "kubernetes"
+	}
+
+	vaultClient, err := vaultlib.NewVaultClient()
+	if err != nil {
+		namespacelog.Error(err, "Failed to create Vault client")
+		return nil, err
+	}
+
+	err = vaultlib.VaultLoginWithK8sAuth(ctx, vaultClient, mount, jwt, role)
+	if err != nil {
+		namespacelog.Error(err, "Failed to login to Vault")
+		return nil, err
+	}
+	vaultlib.LogAudit(jwt, "Vault login with Kubernetes auth", map[string]interface{}{})
+
+	err = vaultlib.DeleteVaultKubernetesAuthRole(namespace, vaultClient, mount)
+	if err != nil {
+		namespacelog.Error(err, "Failed to delete Vault Kubernetes auth role")
+		return nil, err
+	}
+	roleName := namespace.GetName()
+	vaultlib.LogAudit(jwt, "Deleted Vault Kubernetes auth role", map[string]interface{}{"roleName": roleName, "namespace": namespace.GetName()})
+
+	err = vaultlib.DeleteVaultPolicy(namespace, vaultClient)
+	if err != nil {
+		namespacelog.Error(err, "Failed to delete Vault policy")
+		return nil, err
+	}
+	policyName := fmt.Sprintf("%s-policy", namespace.GetName())
+	vaultlib.LogAudit(jwt, "Deleted Vault policy", map[string]interface{}{"policyName": policyName, "namespace": namespace.GetName()})
 
 	return nil, nil
 }
