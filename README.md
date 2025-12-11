@@ -1,7 +1,16 @@
 # vault-secret-injector
 
 ## Description
-vault-secret-injector je Kubernetes operator vytvořený pomocí operator-sdk a kubebuilder, který spravuje VaultSecret vlastní zdroje. Umožňuje injektovat tajné údaje z HashiCorp Vault do Kubernetes Secrets. Operator obsahuje validační webhook, který kontroluje vytváření Namespace, zajišťujíc, že mohou být vytvořeny pouze Namespaces s označením `vault-injection=enabled`.
+vault-secret-injector je Kubernetes operator vytvořený pomocí operator-sdk a kubebuilder, který spravuje VaultSecret vlastní zdroje. Umožňuje injektovat tajné údaje z HashiCorp Vault do Kubernetes Secrets, čímž zajišťuje bezpečnou správu a distribuci citlivých dat v Kubernetes prostředí. Operator automaticky synchronizuje tajné údaje z Vault do odpovídajících Kubernetes Secrets na základě definovaných VaultSecret CRD.
+
+### Validating Webhook
+Operator obsahuje validační webhook pro Namespace zdroje, který provádí následující akce při vytváření, aktualizaci nebo mazání Namespace:
+
+- **Při vytváření Namespace**: Webhook se autentizuje do HashiCorp Vault pomocí Kubernetes autentizace, vytvoří Vault politiku umožňující čtení a výpis tajných údajů v cestě `secret/data/{namespace}/*`, a vytvoří Kubernetes autentizační roli ve Vault vázanou na daný Namespace s touto politikou.
+- **Při aktualizaci Namespace**: V současné době neprovádí žádné akce (vyhrazeno pro budoucí rozšíření).
+- **Při mazání Namespace**: Webhook se autentizuje do Vault, smaže odpovídající Kubernetes autentizační roli a politiku spojenou s Namespace.
+
+Tento webhook zajišťuje automatickou správu Vault zdrojů pro každý Namespace, což usnadňuje izolaci a správu tajných údajů na úrovni Namespace.
 
 ### Příklad VaultSecret CRD
 
