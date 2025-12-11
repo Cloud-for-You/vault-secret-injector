@@ -65,9 +65,13 @@ spec:
         - /manager
         env:
           - name: VAULT_ADDR
-            value: "http://vault.vault.svc.cluster.local:8200"
-          - name: VAULT_ROLE_ID
-            value: "my-role-id"
+            value: "http://vault.hscp-vault.svc.cluster.local:8200"
+          - name: VAULT_K8S_AUTH_MOUNT
+            value: "k8s-kind"
+          - name: VAULT_ROLE
+            value: "policy-manager"
+          - name: VAULT_TLS_SKIP_VERIFY
+            value: "true"
         image: controller:latest
         imagePullPolicy: Always
         name: manager

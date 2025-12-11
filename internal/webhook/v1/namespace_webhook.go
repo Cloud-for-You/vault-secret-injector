@@ -20,7 +20,6 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"time"
 
 	k8siov1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -29,16 +28,12 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
-	"github.com/hashicorp/vault-client-go"
-	"github.com/hashicorp/vault-client-go/schema"
+	vaultlib "github.com/cloud-for-you/vault-secret-injector/internal/vault"
 )
 
 // nolint:unused
 // log is for logging in this package.
 var namespacelog = logf.Log.WithName("namespace-resource")
-
-var vaultClient *vault.Client
-var err error
 
 // SetupNamespaceWebhookWithManager registers the webhook for Namespace in the manager.
 func SetupNamespaceWebhookWithManager(mgr ctrl.Manager) error {
@@ -66,7 +61,7 @@ type NamespaceCustomValidator struct {
 var _ webhook.CustomValidator = &NamespaceCustomValidator{}
 
 // ValidateCreate implements webhook.CustomValidator so a webhook will be registered for the type Namespace.
-func (v *NamespaceCustomValidator) ValidateCreate(_ context.Context, obj runtime.Object) (admission.Warnings, error) {
+func (v *NamespaceCustomValidator) ValidateCreate(ctx context.Context, obj runtime.Object) (admission.Warnings, error) {
 	namespace, ok := obj.(*k8siov1.Namespace)
 	if !ok {
 		return nil, fmt.Errorf("expected a Namespace object but got %T", obj)
@@ -78,40 +73,43 @@ func (v *NamespaceCustomValidator) ValidateCreate(_ context.Context, obj runtime
 		return nil, fmt.Errorf("namespace %s must have label 'vault-injection=enabled' to be created", namespace.GetName())
 	}
 
-  ctx := context.Background()
-
-	vaultClient, err = vault.New(
-		vault.WithAddress(os.Getenv("VAULT_ADDR")),
-		vault.WithRequestTimeout(30 * time.Second),
-	)
-	if err != nil {
-		namespacelog.Error(err, "Failed to initialize Vault client")
-		return nil, err
-	}
-
-	// read JWT token for ServiceAccount
   jwt, err := os.ReadFile("/var/run/secrets/kubernetes.io/serviceaccount/token")
   if err != nil {
-		namespacelog.Error(err, "Failed to read ServiceAccount JWT token")
+    namespacelog.Error(err, "Failed to read ServiceAccount JWT token")
+    return nil, err
+  }
+	role := os.Getenv("VAULT_ROLE")
+	mount := os.Getenv("VAULT_K8S_AUTH_MOUNT")
+	if mount == "" {
+	  mount = "kubernetes"
+	}
+
+  vaultClient, err := vaultlib.NewVaultClient()
+  if err != nil {
+    namespacelog.Error(err, "Failed to create Vault client")
     return nil, err
   }
 
-	resp, err := vaultClient.Auth.AppRoleLogin(
-	  ctx,
-	  schema.AppRoleLoginRequest{
-		  RoleId:   os.Getenv("VAULT_ROLE_ID"),
-		  SecretId: string(jwt),
-	  },
-	  vault.WithMountPath("my/approle/path"), // optional, defaults to "approle"
-  )
-  if err != nil {
-		namespacelog.Error(err, "Failed to authenticate with Vault")
+	err = vaultlib.VaultLoginWithK8sAuth(ctx, vaultClient, mount, jwt, role)
+	if err != nil {
+		namespacelog.Error(err, "Failed to login to Vault")
 		return nil, err
-  }
-	if err := vaultClient.SetToken(resp.Auth.ClientToken); err != nil {
-		namespacelog.Error(err, "Failed to set Vault token")
+	}
+	vaultlib.LogAudit(jwt, "Vault login with Kubernetes auth")
+
+	err = vaultlib.CreateVaultPolicy(namespace, vaultClient)
+	if err != nil {
+		namespacelog.Error(err, "Failed to create Vault policy")
 		return nil, err
-  }
+	}
+	vaultlib.LogAudit(jwt, "Created Vault policy")
+
+	err = vaultlib.CreateVaultKubernetesAuthRole(namespace, vaultClient, mount)
+	if err != nil {
+		namespacelog.Error(err, "Failed to create Vault Kubernetes auth role")
+		return nil, err
+	}
+	vaultlib.LogAudit(jwt, "Created Vault Kubernetes auth role")
 
 	return nil, nil
 }
