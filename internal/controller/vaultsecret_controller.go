@@ -19,9 +19,13 @@ package controller
 import (
 	"context"
 
+	authenticationv1 "k8s.io/api/authentication/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/kubernetes"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/log"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 
 	cfyczv1 "github.com/cloud-for-you/vault-secret-injector/api/v1"
@@ -37,6 +41,7 @@ type VaultSecretReconciler struct {
 // +kubebuilder:rbac:groups=cfy.cz,resources=vaultsecrets/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=cfy.cz,resources=vaultsecrets/finalizers,verbs=update
 // +kubebuilder:rbac:groups=core,resources=secrets,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=core,resources=serviceaccounts/token,verbs=get;create
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
@@ -51,6 +56,22 @@ func (r *VaultSecretReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 	_ = logf.FromContext(ctx)
 
 	// TODO(user): your logic here
+	var vaultSecret cfyczv1.VaultSecret
+	if err := r.Get(ctx, req.NamespacedName, &vaultSecret); err != nil {
+		// handle error
+		return ctrl.Result{}, client.IgnoreNotFound(err)
+	}
+	log.Log.Info("Reconciling VaultSecret", "name", vaultSecret.Name, "namespace", vaultSecret.Namespace)
+
+	// Get Impersonate Service Account Token
+	clientset := kubernetes.NewForConfigOrDie(ctrl.GetConfigOrDie())
+	_, err := GetImpersonateSAToken(ctx, clientset, vaultSecret.GetNamespace(), "default", "serviceaccount", int64(600))
+	if err != nil {
+		log.Log.Error(err, "Failed to get impersonated service account token")
+		return ctrl.Result{}, err
+	}
+	log.Log.Info("Successfully obtained impersonated service account token")
+	
 
 	return ctrl.Result{}, nil
 }
@@ -63,17 +84,27 @@ func (r *VaultSecretReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Complete(r)
 }
 
-// GetImpersonateSAToken requests a service account token (not implemented).
+// GetImpersonateSAToken requests a service account token.
 // Parameters:
 // - ctx: context for the request
+// - clientset: the Kubernetes clientset
 // - namespace: the namespace
 // - serviceaccount: the service account name
 // - audience: the audience for the token
 // - ttl: time to live in seconds
 // Returns: the JWT token string or error
-func GetImpersonateSAToken(ctx context.Context, namespace, serviceaccount, audience string, ttl int64) (string, error) {
-  
+func GetImpersonateSAToken(ctx context.Context, clientset *kubernetes.Clientset, namespace, serviceAccount, audience string, ttl int64) (string, error) {
+	tokenRequest := &authenticationv1.TokenRequest{
+		Spec: authenticationv1.TokenRequestSpec{
+			Audiences:         []string{audience},
+			ExpirationSeconds: &ttl,
+		},
+	}
 
-	
-	return "", nil
+	result, err := clientset.CoreV1().ServiceAccounts(namespace).CreateToken(ctx, serviceAccount, tokenRequest, metav1.CreateOptions{})
+	if err != nil {
+		return "", err
+	}
+
+	return result.Status.Token, nil
 }

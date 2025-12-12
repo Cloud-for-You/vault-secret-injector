@@ -17,6 +17,13 @@ rules:
   - update
   - watch
 - apiGroups:
+  - ""
+  resources:
+  - serviceaccounts/token
+  verbs:
+  - create
+  - get
+- apiGroups:
   - cfy.cz
   resources:
   - vaultsecrets
