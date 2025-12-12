@@ -29,6 +29,7 @@ import (
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 
 	cfyczv1 "github.com/cloud-for-you/vault-secret-injector/api/v1"
+	vaultlib "github.com/cloud-for-you/vault-secret-injector/internal/vault"
 )
 
 // VaultSecretReconciler reconciles a VaultSecret object
@@ -65,13 +66,27 @@ func (r *VaultSecretReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 
 	// Get Impersonate Service Account Token
 	clientset := kubernetes.NewForConfigOrDie(ctrl.GetConfigOrDie())
-	_, err := GetImpersonateSAToken(ctx, clientset, vaultSecret.GetNamespace(), "default", "serviceaccount", int64(600))
+	impersonateJwt, err := GetImpersonateSAToken(ctx, clientset, vaultSecret.GetNamespace(), "default", "serviceaccount", int64(600))
 	if err != nil {
 		log.Log.Error(err, "Failed to get impersonated service account token")
 		return ctrl.Result{}, err
 	}
 	log.Log.Info("Successfully obtained impersonated service account token")
 	
+	// Create Vault Client
+  vaultClient, err := vaultlib.NewVaultClient()
+  if err != nil {
+    log.Log.Error(err, "Failed to create Vault client")
+    return ctrl.Result{}, err
+  }
+
+	// Login to Vault with K8s Auth Method
+	err = vaultlib.VaultLoginWithK8sAuth(ctx, vaultClient, "k8s-kind", impersonateJwt, vaultSecret.GetNamespace())
+	if err != nil {
+		log.Log.Error(err, "Failed to login to Vault")
+		return ctrl.Result{}, err
+	}
+  log.Log.Info("Successfully logged in to Vault")
 
 	return ctrl.Result{}, nil
 }
