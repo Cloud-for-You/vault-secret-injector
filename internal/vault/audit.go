@@ -17,7 +17,10 @@ type AuditEntry struct {
 	Context map[string]interface{} `json:"context,omitempty"`
 }
 
-// parseJWT extracts the subject (who) from a JWT token without verification
+// parseJWT extracts the subject (who) from a JWT token without verification.
+// Parameters:
+// - tokenString: the JWT token as a string
+// Returns: the subject claim or "unknown" if not found, and an error if parsing fails
 func parseJWT(tokenString string) (string, error) {
 	token, _, err := jwt.NewParser().ParseUnverified(tokenString, jwt.MapClaims{})
 	if err != nil {
@@ -33,9 +36,13 @@ func parseJWT(tokenString string) (string, error) {
 	return "unknown", nil
 }
 
-// LogAudit logs an audit entry in structured format
-func LogAudit(jwtToken []byte, action string, context map[string]interface{}) {
-	who, err := parseJWT(string(jwtToken))
+// LogAudit logs an audit entry in structured format.
+// Parameters:
+// - jwtToken: the JWT token used to extract the user identity
+// - action: the action being audited
+// - context: additional context information for the audit log
+func LogAudit(jwtToken string, action string, context map[string]interface{}) {
+	who, err := parseJWT(jwtToken)
 	if err != nil {
 		auditlog.Error(err, "Failed to parse JWT for audit")
 		who = "unknown"

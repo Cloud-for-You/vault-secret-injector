@@ -7,7 +7,14 @@ import (
 	k8siov1 "k8s.io/api/core/v1"
 )
 
-func CreateVaultKubernetesAuthRole(ctx *k8siov1.Namespace, client *vaultapi.Client, mount string) error {
+// CreateVaultKubernetesAuthRole creates a Kubernetes auth role in Vault for the given namespace.
+// Parameters:
+// - ctx: the Kubernetes namespace object
+// - client: the Vault API client
+// - mount: the mount path for Kubernetes auth
+// - jwt: the JWT token for auditing
+// Returns: error if creation fails
+func CreateVaultKubernetesAuthRole(ctx *k8siov1.Namespace, client *vaultapi.Client, mount string, jwt string) error {
 	roleName := ctx.GetName()
 	policyName := fmt.Sprintf("%s-policy", ctx.GetName())
 
@@ -23,10 +30,19 @@ func CreateVaultKubernetesAuthRole(ctx *k8siov1.Namespace, client *vaultapi.Clie
 		return fmt.Errorf("failed to create Vault role %s: %w", roleName, err)
 	}
 
+	LogAudit(jwt, "Created Vault Kubernetes auth role", map[string]interface{}{"roleName": roleName, "roleData": roleData})
+
 	return nil
 }
 
-func DeleteVaultKubernetesAuthRole(ctx *k8siov1.Namespace, client *vaultapi.Client, mount string) error {
+// DeleteVaultKubernetesAuthRole deletes the Kubernetes auth role in Vault for the given namespace.
+// Parameters:
+// - ctx: the Kubernetes namespace object
+// - client: the Vault API client
+// - mount: the mount path for Kubernetes auth
+// - jwt: the JWT token for auditing
+// Returns: error if deletion fails
+func DeleteVaultKubernetesAuthRole(ctx *k8siov1.Namespace, client *vaultapi.Client, mount string, jwt string) error {
 	roleName := ctx.GetName()
 
 	path := fmt.Sprintf("auth/%s/role/%s", mount, roleName)
@@ -34,6 +50,8 @@ func DeleteVaultKubernetesAuthRole(ctx *k8siov1.Namespace, client *vaultapi.Clie
 	if err != nil {
 		return fmt.Errorf("failed to delete Vault role %s: %w", roleName, err)
 	}
+
+	LogAudit(jwt, "Deleted Vault Kubernetes auth role", map[string]interface{}{"roleName": roleName, "namespace": ctx.GetName()})
 
 	return nil
 }

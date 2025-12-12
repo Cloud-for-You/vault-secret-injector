@@ -9,11 +9,9 @@ import (
 	vaultk8s "github.com/hashicorp/vault/api/auth/kubernetes"
 )
 
-func RequestSAToken(ctx context.Context, namespace, serviceaccount, audience string, ttl int64) (string, error) {
-	// TODO: Implement this function
-	return "", nil
-}
-
+// NewVaultClient creates a new Vault API client with configuration from environment variables.
+// Uses VAULT_ADDR and VAULT_TLS_SKIP_VERIFY environment variables.
+// Returns: the configured Vault client or error
 func NewVaultClient() (*vaultapi.Client, error) {
 	cfg := vaultapi.DefaultConfig()
 	cfg.Address = os.Getenv("VAULT_ADDR")
@@ -24,10 +22,18 @@ func NewVaultClient() (*vaultapi.Client, error) {
 	return vaultapi.NewClient(cfg)
 }
 
-func VaultLoginWithK8sAuth(ctx context.Context, client *vaultapi.Client, mount string, jwt []byte, role string) error {
+// VaultLoginWithK8sAuth performs login to Vault using Kubernetes authentication.
+// Parameters:
+// - ctx: context for the login request
+// - client: the Vault API client
+// - mount: the mount path for Kubernetes auth
+// - jwt: the JWT token for authentication
+// - role: the Vault role to authenticate as
+// Returns: error if login fails
+func VaultLoginWithK8sAuth(ctx context.Context, client *vaultapi.Client, mount string, jwt string, role string) error {
   auth, err := vaultk8s.NewKubernetesAuth(
     role,
-    vaultk8s.WithServiceAccountToken(string(jwt)),
+    vaultk8s.WithServiceAccountToken(jwt),
 		vaultk8s.WithMountPath(mount),
   )
 	if err != nil {
@@ -40,6 +46,8 @@ func VaultLoginWithK8sAuth(ctx context.Context, client *vaultapi.Client, mount s
 	if sec == nil {
 		return fmt.Errorf("no secret returned from login")
 	}
+
+	LogAudit(jwt, "Vault login with Kubernetes auth", map[string]interface{}{})
 
 	return nil
 }

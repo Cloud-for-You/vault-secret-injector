@@ -84,35 +84,29 @@ func (v *NamespaceCustomValidator) ValidateCreate(ctx context.Context, obj runti
     return nil, err
   }
 
-	err = vaultlib.VaultLoginWithK8sAuth(ctx, vaultClient, mount, jwt, role)
+	err = vaultlib.VaultLoginWithK8sAuth(ctx, vaultClient, mount, string(jwt), role)
 	if err != nil {
 		namespacelog.Error(err, "Failed to login to Vault")
 		return nil, err
 	}
-	vaultlib.LogAudit(jwt, "Vault login with Kubernetes auth", map[string]interface{}{})
 
-	err = vaultlib.CreateVaultPolicy(namespace, vaultClient)
+	err = vaultlib.CreateVaultPolicy(namespace, vaultClient, string(jwt))
 	if err != nil {
 		namespacelog.Error(err, "Failed to create Vault policy")
 		return nil, err
 	}
-	policyName := fmt.Sprintf("%s-policy", namespace.GetName())
-	policyRules := fmt.Sprintf(`path "secret/data/%s/*" { capabilities = ["read","list"] }`, namespace.GetName())
-	vaultlib.LogAudit(jwt, "Created Vault policy", map[string]interface{}{"policyName": policyName, "policyRules": policyRules})
 
-	err = vaultlib.CreateVaultKubernetesAuthRole(namespace, vaultClient, mount)
+	err = vaultlib.CreateVaultKubernetesAuthRole(namespace, vaultClient, mount, string(jwt))
 	if err != nil {
 		namespacelog.Error(err, "Failed to create Vault Kubernetes auth role")
 		return nil, err
 	}
-	roleName := namespace.GetName()
-	policyName = fmt.Sprintf("%s-policy", namespace.GetName())
-	roleData := map[string]interface{}{
-		"bound_service_account_names":      []string{"*"},
-		"bound_service_account_namespaces": []string{namespace.GetName()},
-		"policies":                         []string{policyName},
+
+	err = vaultlib.CreateSecretEngineKV2(namespace, vaultClient, string(jwt))
+	if err != nil {
+		namespacelog.Error(err, "Failed to create Vault secret engine")
+		return nil, err
 	}
-	vaultlib.LogAudit(jwt, "Created Vault Kubernetes auth role", map[string]interface{}{"roleName": roleName, "roleData": roleData})
 
 	return nil, nil
 }
@@ -155,28 +149,29 @@ func (v *NamespaceCustomValidator) ValidateDelete(ctx context.Context, obj runti
 		return nil, err
 	}
 
-	err = vaultlib.VaultLoginWithK8sAuth(ctx, vaultClient, mount, jwt, role)
+	err = vaultlib.VaultLoginWithK8sAuth(ctx, vaultClient, mount, string(jwt), role)
 	if err != nil {
 		namespacelog.Error(err, "Failed to login to Vault")
 		return nil, err
 	}
-	vaultlib.LogAudit(jwt, "Vault login with Kubernetes auth", map[string]interface{}{})
 
-	err = vaultlib.DeleteVaultKubernetesAuthRole(namespace, vaultClient, mount)
+	err = vaultlib.DeleteVaultKubernetesAuthRole(namespace, vaultClient, mount, string(jwt))
 	if err != nil {
 		namespacelog.Error(err, "Failed to delete Vault Kubernetes auth role")
 		return nil, err
 	}
-	roleName := namespace.GetName()
-	vaultlib.LogAudit(jwt, "Deleted Vault Kubernetes auth role", map[string]interface{}{"roleName": roleName, "namespace": namespace.GetName()})
 
-	err = vaultlib.DeleteVaultPolicy(namespace, vaultClient)
+	err = vaultlib.DeleteVaultPolicy(namespace, vaultClient, string(jwt))
 	if err != nil {
 		namespacelog.Error(err, "Failed to delete Vault policy")
 		return nil, err
 	}
-	policyName := fmt.Sprintf("%s-policy", namespace.GetName())
-	vaultlib.LogAudit(jwt, "Deleted Vault policy", map[string]interface{}{"policyName": policyName, "namespace": namespace.GetName()})
+
+	err = vaultlib.DeleteSecretEngineKV2(namespace, vaultClient, string(jwt))
+	if err != nil {
+		namespacelog.Error(err, "Failed to delete Vault secret engine")
+		return nil, err
+	}
 
 	return nil, nil
 }

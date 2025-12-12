@@ -7,7 +7,13 @@ import (
 	k8siov1 "k8s.io/api/core/v1"
 )
 
-func CreateVaultPolicy(ctx *k8siov1.Namespace, client *vaultapi.Client) error {
+// CreateVaultPolicy creates a Vault policy allowing read access to secrets in the namespace.
+// Parameters:
+// - ctx: the Kubernetes namespace object
+// - client: the Vault API client
+// - jwt: the JWT token for auditing
+// Returns: error if creation fails
+func CreateVaultPolicy(ctx *k8siov1.Namespace, client *vaultapi.Client, jwt string) error {
 	policyName := fmt.Sprintf("%s-policy", ctx.GetName())
 	policyRules := fmt.Sprintf(`
 path "secret/data/%s/*" { capabilities = ["read","list"] }
@@ -18,16 +24,26 @@ path "secret/data/%s/*" { capabilities = ["read","list"] }
 		return fmt.Errorf("failed to create policy %s: %w", policyName, err)
 	}
 
+	LogAudit(jwt, "Created Vault policy", map[string]interface{}{"policyName": policyName, "policyRules": policyRules})
+
 	return nil
 }
 
-func DeleteVaultPolicy(ctx *k8siov1.Namespace, client *vaultapi.Client) error {
+// DeleteVaultPolicy deletes the Vault policy for the namespace.
+// Parameters:
+// - ctx: the Kubernetes namespace object
+// - client: the Vault API client
+// - jwt: the JWT token for auditing
+// Returns: error if deletion fails
+func DeleteVaultPolicy(ctx *k8siov1.Namespace, client *vaultapi.Client, jwt string) error {
 	policyName := fmt.Sprintf("%s-policy", ctx.GetName())
 
 	err := client.Sys().DeletePolicy(policyName)
 	if err != nil {
 		return fmt.Errorf("failed to delete policy %s: %w", policyName, err)
 	}
+
+	LogAudit(jwt, "Deleted Vault policy", map[string]interface{}{"policyName": policyName, "namespace": ctx.GetName()})
 
 	return nil
 }
