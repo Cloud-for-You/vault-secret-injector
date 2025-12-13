@@ -22,7 +22,6 @@ func CreateOrUpdateSecretEngineKV(ctx *k8siov1.Namespace, client *vaultapi.Clien
 	}
 
 	if _, exists := mounts[mountPath+"/"]; exists {
-		// already exists
 		LogAudit(jwt, "Vault secret engine already exists", map[string]interface{}{"mountPath": mountPath, "namespace": ctx.GetName()})
 		return nil
 	}
