@@ -7,23 +7,34 @@ import (
 	k8siov1 "k8s.io/api/core/v1"
 )
 
-// CreateSecretEngineKV2 creates a KV v2 secret engine mount in Vault for the namespace.
+// CreateOrUpdateSecretEngineKV creates or updates a KV v2 secret engine mount in Vault for the namespace.
 // Parameters:
 // - ctx: the Kubernetes namespace object
 // - client: the Vault API client
 // - jwt: the JWT token for auditing
-// Returns: error if creation fails
-func CreateSecretEngineKV(ctx *k8siov1.Namespace, client *vaultapi.Client, jwt string) error {
+// Returns: error if creation or update fails
+func CreateOrUpdateSecretEngineKV(ctx *k8siov1.Namespace, client *vaultapi.Client, jwt string) error {
 	mountPath := fmt.Sprintf("kv-%s", ctx.GetName())
-	
+
+	mounts, err := client.Sys().ListMounts()
+	if err != nil {
+		return fmt.Errorf("failed to list mounts: %w", err)
+	}
+
+	if _, exists := mounts[mountPath+"/"]; exists {
+		// already exists
+		LogAudit(jwt, "Vault secret engine already exists", map[string]interface{}{"mountPath": mountPath, "namespace": ctx.GetName()})
+		return nil
+	}
+
 	mountInput := &vaultapi.MountInput{
 		Type: "kv",
 		Options: map[string]string{
 			"version": "2",
 		},
 	}
-	
-	err := client.Sys().Mount(mountPath, mountInput)
+
+	err = client.Sys().Mount(mountPath, mountInput)
 	if err != nil {
 		return fmt.Errorf("failed to create secret engine at %s: %w", mountPath, err)
 	}
@@ -40,7 +51,7 @@ func CreateSecretEngineKV(ctx *k8siov1.Namespace, client *vaultapi.Client, jwt s
 // - jwt: the JWT token for auditing
 // Returns: error if deletion fails
 func DeleteSecretEngineKV(ctx *k8siov1.Namespace, client *vaultapi.Client, jwt string) error {
-	mountPath := fmt.Sprintf("secret-%s", ctx.GetName())
+	mountPath := fmt.Sprintf("kv-%s", ctx.GetName())
 
 	err := client.Sys().Unmount(mountPath)
 	if err != nil {

@@ -102,9 +102,9 @@ func (v *NamespaceCustomValidator) ValidateCreate(ctx context.Context, obj runti
 		return nil, err
 	}
 
-	err = vaultlib.CreateSecretEngineKV(namespace, vaultClient, string(jwt))
+	err = vaultlib.CreateOrUpdateSecretEngineKV(namespace, vaultClient, string(jwt))
 	if err != nil {
-		namespacelog.Error(err, "Failed to create Vault secret engine")
+		namespacelog.Error(err, "Failed to create or update Vault secret engine")
 		return nil, err
 	}
 
