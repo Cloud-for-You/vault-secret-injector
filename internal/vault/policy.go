@@ -14,10 +14,8 @@ import (
 // - jwt: the JWT token for auditing
 // Returns: error if creation fails
 func CreateVaultPolicy(ctx *k8siov1.Namespace, client *vaultapi.Client, jwt string) error {
-	policyName := fmt.Sprintf("%s-policy", ctx.GetName())
-	policyRules := fmt.Sprintf(`
-path "secret/data/%s/*" { capabilities = ["read","list"] }
-`, ctx.GetName())
+	policyName := fmt.Sprintf("policy-%s", ctx.GetName())
+	policyRules := fmt.Sprintf(`path "kv-%s/data/*" { capabilities = ["read"] }`, ctx.GetName())
 
 	err := client.Sys().PutPolicy(policyName, policyRules)
 	if err != nil {
@@ -36,7 +34,7 @@ path "secret/data/%s/*" { capabilities = ["read","list"] }
 // - jwt: the JWT token for auditing
 // Returns: error if deletion fails
 func DeleteVaultPolicy(ctx *k8siov1.Namespace, client *vaultapi.Client, jwt string) error {
-	policyName := fmt.Sprintf("%s-policy", ctx.GetName())
+	policyName := fmt.Sprintf("policy-%s", ctx.GetName())
 
 	err := client.Sys().DeletePolicy(policyName)
 	if err != nil {

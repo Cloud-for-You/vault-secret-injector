@@ -71,7 +71,7 @@ func (r *VaultSecretReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 		log.Log.Error(err, "Failed to get impersonated service account token")
 		return ctrl.Result{}, err
 	}
-	log.Log.Info("Successfully obtained impersonated service account token")
+	vaultlib.LogAudit(impersonateJwt, "Obtained impersonated service account token", map[string]interface{}{"namespace": vaultSecret.GetNamespace(), "serviceAccount": "default"})
 	
 	// Create Vault Client
   vaultClient, err := vaultlib.NewVaultClient()
@@ -86,16 +86,14 @@ func (r *VaultSecretReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 		log.Log.Error(err, "Failed to login to Vault")
 		return ctrl.Result{}, err
 	}
-  log.Log.Info("Successfully logged in to Vault")
 
 	// Fetch data from Vault KV engine
-	kvPath := "test"
-	secretData, err := vaultlib.FetchSecretEngineKV(vaultClient, impersonateJwt, kvPath)
+	kvMount := "kv-test"
+	secretData, err := vaultlib.FetchSecretEngineKV(vaultClient, impersonateJwt, kvMount, "test")
 	if err != nil {
-		log.Log.Error(err, "Failed to fetch secret from Vault", "path", kvPath)
+		log.Log.Error(err, "Failed to fetch secret from Vault", "path", kvMount+"/data/test")
 		return ctrl.Result{}, err
 	}
-	log.Log.Info("Successfully fetched secret from Vault", "path", kvPath)
 
 	// Print fetched data in JSON format (only for demonstration; avoid in production)
 	log.Log.Info("Fetched secret data", "data", secretData)
@@ -111,7 +109,7 @@ func (r *VaultSecretReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Complete(r)
 }
 
-// GetImpersonateSAToken requests a service account token.
+// getImpersonateSAToken requests a service account token.
 // Parameters:
 // - ctx: context for the request
 // - clientset: the Kubernetes clientset

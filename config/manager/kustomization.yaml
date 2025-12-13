@@ -6,4 +6,4 @@ kind: Kustomization
 images:
 - name: controller
   newName: quay.io/cloud-for-you/vault-secret-injector
-  newTag: develop-22
+  newTag: develop-29

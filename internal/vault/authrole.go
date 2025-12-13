@@ -16,12 +16,25 @@ import (
 // Returns: error if creation fails
 func CreateVaultKubernetesAuthRole(ctx *k8siov1.Namespace, client *vaultapi.Client, mount string, jwt string) error {
 	roleName := ctx.GetName()
-	policyName := fmt.Sprintf("%s-policy", ctx.GetName())
+	policyName := fmt.Sprintf("policy-%s", ctx.GetName())
 
 	roleData := map[string]interface{}{
+		// Kubernetes auth role configuration
+		"alias_name_source":                "serviceaccount_uid",
+		"audience":                         "serviceaccount",
 		"bound_service_account_names":      []string{"*"},
 		"bound_service_account_namespaces": []string{ctx.GetName()},
-		"policies":                         []string{policyName},
+		"bound_service_account_namespace_selector": "",
+		// Vault policies to attach to tokens issued for this role
+		"token_type":                       "default",
+		"token_ttl":                        "10m",
+		"token_max_ttl":                    "10m",
+		"token_explicit_max_ttl":					  "10m",
+		"token_policies":                   []string{policyName},
+		"token_no_default_policy":          true,
+    "token_num_uses":                   0,
+		"token_period":                     0,
+		"token_bound_cidrs":               []string{},
 	}
 
 	path := fmt.Sprintf("auth/%s/role/%s", mount, roleName)

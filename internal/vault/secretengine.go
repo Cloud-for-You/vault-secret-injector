@@ -56,24 +56,25 @@ func DeleteSecretEngineKV(ctx *k8siov1.Namespace, client *vaultapi.Client, jwt s
 // Parameters:
 // - client: the Vault API client
 // - jwt: the JWT token for auditing
+// - mount: the mount path of the KV engine
 // - path: the path to the secret in Vault
 // Returns: the secret data as a map or error
-func FetchSecretEngineKV(client *vaultapi.Client, jwt string, path string) (map[string]interface{}, error) {
-	secret, err := client.Logical().Read(path)
+func FetchSecretEngineKV(client *vaultapi.Client, jwt, mount, path string) (map[string]interface{}, error) {
+	secretPath := fmt.Sprintf("%s/data/%s", mount, path)
+	secret, err := client.Logical().Read(secretPath)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read secret at %s: %w", path, err)
+		return nil, fmt.Errorf("failed to read secret at %s: %w", secretPath, err)
 	}
 	if secret == nil || secret.Data == nil {
-		return nil, fmt.Errorf("no data found at %s", path)
+		return nil, fmt.Errorf("no data found at %s", secretPath)
 	}
 
-	// KV v2 stores the actual data under the "data" key
 	data, ok := secret.Data["data"].(map[string]interface{})
 	if !ok {
-		return nil, fmt.Errorf("invalid data format at %s", path)
+		return nil, fmt.Errorf("invalid data format at %s", secretPath)
 	}
 
-	LogAudit(jwt, "Fetched secret from Vault", map[string]interface{}{"path": path})
+	LogAudit(jwt, "Fetched secret from Vault KV engine", map[string]interface{}{"mount": mount, "path": path})
 
 	return data, nil
 }
