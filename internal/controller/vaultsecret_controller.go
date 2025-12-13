@@ -66,7 +66,7 @@ func (r *VaultSecretReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 
 	// Get Impersonate Service Account Token
 	clientset := kubernetes.NewForConfigOrDie(ctrl.GetConfigOrDie())
-	impersonateJwt, err := GetImpersonateSAToken(ctx, clientset, vaultSecret.GetNamespace(), "default", "serviceaccount", int64(600))
+	impersonateJwt, err := getImpersonateSAToken(ctx, clientset, vaultSecret.GetNamespace(), "default", "serviceaccount", int64(600))
 	if err != nil {
 		log.Log.Error(err, "Failed to get impersonated service account token")
 		return ctrl.Result{}, err
@@ -88,6 +88,18 @@ func (r *VaultSecretReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 	}
   log.Log.Info("Successfully logged in to Vault")
 
+	// Fetch data from Vault KV engine
+	kvPath := "test"
+	secretData, err := vaultlib.FetchSecretEngineKV(vaultClient, impersonateJwt, kvPath)
+	if err != nil {
+		log.Log.Error(err, "Failed to fetch secret from Vault", "path", kvPath)
+		return ctrl.Result{}, err
+	}
+	log.Log.Info("Successfully fetched secret from Vault", "path", kvPath)
+
+	// Print fetched data in JSON format (only for demonstration; avoid in production)
+	log.Log.Info("Fetched secret data", "data", secretData)
+
 	return ctrl.Result{}, nil
 }
 
@@ -108,7 +120,7 @@ func (r *VaultSecretReconciler) SetupWithManager(mgr ctrl.Manager) error {
 // - audience: the audience for the token
 // - ttl: time to live in seconds
 // Returns: the JWT token string or error
-func GetImpersonateSAToken(ctx context.Context, clientset *kubernetes.Clientset, namespace, serviceAccount, audience string, ttl int64) (string, error) {
+func getImpersonateSAToken(ctx context.Context, clientset *kubernetes.Clientset, namespace, serviceAccount, audience string, ttl int64) (string, error) {
 	tokenRequest := &authenticationv1.TokenRequest{
 		Spec: authenticationv1.TokenRequestSpec{
 			Audiences:         []string{audience},

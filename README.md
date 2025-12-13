@@ -1,18 +1,38 @@
 # vault-secret-injector
 
 ## Description
-vault-secret-injector je Kubernetes operator vytvořený pomocí operator-sdk a kubebuilder, který spravuje VaultSecret vlastní zdroje. Umožňuje injektovat tajné údaje z HashiCorp Vault do Kubernetes Secrets, čímž zajišťuje bezpečnou správu a distribuci citlivých dat v Kubernetes prostředí. Operator automaticky synchronizuje tajné údaje z Vault do odpovídajících Kubernetes Secrets na základě definovaných VaultSecret CRD.
+Operátor, který poskytuje komplexní řešení pro správu tajných údajů v Kubernetes prostředí pomocí HashiCorp Vault. Projekt nabízí:
+
+- **Automatickou synchronizaci tajných údajů**: Operator kontinuálně synchronizuje data z Vault do Kubernetes Secrets na základě definovaných VaultSecret CRD
+- **Bezpečnou správu citlivých dat**: Centralizovaná správa tajných údajů s pokročilými bezpečnostními funkcemi Vault
+- **Izolaci na úrovni Namespace**: Každý Namespace má své vlastní Vault politiky a autentizační role
+- **Validaci a automatizaci**: Integrované validační webhooky zajišťují správnou konfiguraci a automatickou správu Vault zdrojů
+
+### Výhody a použití
+Tento operator je ideální pro organizace, které potřebují:
+- Centralizovanou správu tajných údajů napříč více aplikacemi a týmy, ale nechtějí implementovat plný Vault Secret Operátor z důvodu složité konfigurace
+- Automatickou rotaci a aktualizaci credentials bez výpadků služeb
+- Dodržování bezpečnostních standardů s auditováním přístupu k tajným údajům
+- Snadnou integraci s existujícími Kubernetes deploymenty a CI/CD pipelines
+- Izolaci tajných údajů mezi různými prostředími (dev, staging, prod)
 
 ### Validating Webhook
-Operator obsahuje validační webhook pro Namespace zdroje, který provádí následující akce při vytváření, aktualizaci nebo mazání Namespace:
+Operator obsahuje validační webhook pro Namespace zdroje, který automaticky spravuje Vault zdroje při životním cyklu Namespace. Tato funkce přináší uživatelům následující výhody:
+
+- **Automatická izolace tajných údajů**: Každý Namespace získá své vlastní Vault politiky a role bez manuální konfigurace
+- **Zabezpečení podle principu nejmenších privilegií**: Service Accounts v Namespace mohou přistupovat pouze k tajným údajům svého Namespace
+- **Automatické čištění**: Při smazání Namespace se automaticky odstraní související Vault zdroje, čímž se předchází zanechání osiřelých politik
+- **Auditovatelnost**: Všechny akce webhooku jsou auditovány ve Vault pro sledování změn
+- **Zjednodušení správy**: Eliminuje potřebu manuální správy Vault politik pro každý Namespace
+
+Webhook provádí následující akce při vytváření, aktualizaci nebo mazání Namespace:
 
 - **Při vytváření Namespace**: Webhook se autentizuje do HashiCorp Vault pomocí Kubernetes autentizace, vytvoří Vault politiku umožňující čtení a výpis tajných údajů v cestě `secret/data/{namespace}/*`, a vytvoří Kubernetes autentizační roli ve Vault vázanou na daný Namespace s touto politikou.
 - **Při aktualizaci Namespace**: V současné době neprovádí žádné akce (vyhrazeno pro budoucí rozšíření).
 - **Při mazání Namespace**: Webhook se autentizuje do Vault, smaže odpovídající Kubernetes autentizační roli a politiku spojenou s Namespace.
 
-Tento webhook zajišťuje automatickou správu Vault zdrojů pro každý Namespace, což usnadňuje izolaci a správu tajných údajů na úrovni Namespace.
-
-### Příklad VaultSecret CRD
+### Reconciliation Custom CRD
+Operator implementuje reconciliation smyčku pro VaultSecret CRD, která zajišťuje kontinuální synchronizaci tajných údajů z Vault do Kubernetes Secrets. Příkladem použití je VaultSecret CRD:
 
 ```yaml
 apiVersion: cfy.cz/v1

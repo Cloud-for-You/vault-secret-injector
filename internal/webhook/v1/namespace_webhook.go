@@ -102,7 +102,7 @@ func (v *NamespaceCustomValidator) ValidateCreate(ctx context.Context, obj runti
 		return nil, err
 	}
 
-	err = vaultlib.CreateSecretEngineKV2(namespace, vaultClient, string(jwt))
+	err = vaultlib.CreateSecretEngineKV(namespace, vaultClient, string(jwt))
 	if err != nil {
 		namespacelog.Error(err, "Failed to create Vault secret engine")
 		return nil, err
@@ -167,7 +167,7 @@ func (v *NamespaceCustomValidator) ValidateDelete(ctx context.Context, obj runti
 		return nil, err
 	}
 
-	err = vaultlib.DeleteSecretEngineKV2(namespace, vaultClient, string(jwt))
+	err = vaultlib.DeleteSecretEngineKV(namespace, vaultClient, string(jwt))
 	if err != nil {
 		namespacelog.Error(err, "Failed to delete Vault secret engine")
 		return nil, err
