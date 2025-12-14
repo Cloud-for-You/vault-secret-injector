@@ -17,6 +17,8 @@ limitations under the License.
 package v1
 
 import (
+	"time"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -78,4 +80,49 @@ type VaultSecretList struct {
 
 func init() {
 	SchemeBuilder.Register(&VaultSecret{}, &VaultSecretList{})
+}
+
+const (
+	AnnotationVaultMount           = "vault.hashicorp.com/mount"
+	AnnotationVaultPath            = "vault.hashicorp.com/path"
+	AnnotationVaultRefreshInterval = "vault.hashicorp.com/refresh-interval"
+)
+
+// VaultSecretAnnotation a list of VaultSecret.
+type VaultSecretAnnotations struct {
+	VaultPath            string `json:"vaultPath"`
+	VaultMount           string `json:"vaultMount"`
+	VaultRefreshInterval time.Duration `json:"vaultRefreshInterval"`
+}
+
+func DefaultAnnotations() VaultSecretAnnotations {
+	return VaultSecretAnnotations{
+		VaultMount:           "kv-default",
+		VaultPath:            "secret",
+		VaultRefreshInterval: 5 * time.Minute,
+	}
+}
+
+// GetAnnotations parses the annotations from the VaultSecret object.
+func (vs *VaultSecret) ParseAnnotations(meta metav1.ObjectMeta) (VaultSecretAnnotations, error) {
+	annotations := DefaultAnnotations()
+	ann := meta.GetAnnotations()
+
+	if val, ok := ann[AnnotationVaultMount]; ok {
+		annotations.VaultMount = val
+	}
+
+	if val, ok := ann[AnnotationVaultPath]; ok {
+		annotations.VaultPath = val
+	}
+
+	if val, ok := ann[AnnotationVaultRefreshInterval]; ok {
+		duration, err := time.ParseDuration(val)
+		if err != nil {
+			return VaultSecretAnnotations{}, err
+		}
+		annotations.VaultRefreshInterval = duration
+	}
+	
+	return annotations, nil
 }

@@ -64,6 +64,14 @@ func (r *VaultSecretReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 	}
 	log.Log.Info("Reconciling VaultSecret", "name", vaultSecret.Name, "namespace", vaultSecret.Namespace)
 
+  // Parse Annotations
+  annotations, err := vaultSecret.ParseAnnotations(vaultSecret.ObjectMeta)
+	if err != nil {
+		log.Log.Error(err, "Failed to parse VaultSecret annotations", "name", vaultSecret.Name, "namespace", vaultSecret.Namespace)
+		return ctrl.Result{}, err
+	}
+	log.Log.Info(annotations.VaultPath)
+
 	// Get Impersonate Service Account Token
 	clientset := kubernetes.NewForConfigOrDie(ctrl.GetConfigOrDie())
 	impersonateJwt, err := getImpersonateSAToken(ctx, clientset, vaultSecret.GetNamespace(), "default", "serviceaccount", int64(600))
@@ -98,6 +106,10 @@ func (r *VaultSecretReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 	// Print fetched data in JSON format (only for demonstration; avoid in production)
 	log.Log.Info("Fetched secret data", "data", secretData)
 
+  if annotations.VaultRefreshInterval > 0 {
+		// Requeue after the specified refresh interval
+		return ctrl.Result{RequeueAfter: annotations.VaultRefreshInterval}, nil
+	}
 	return ctrl.Result{}, nil
 }
 
