@@ -96,10 +96,9 @@ func (r *VaultSecretReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 	}
 
 	// Fetch data from Vault KV engine
-	kvMount := "kv-test"
-	secretData, err := vaultlib.FetchSecretEngineKV(vaultClient, impersonateJwt, kvMount, "test")
+	secretData, err := vaultlib.FetchSecretEngineKV(vaultClient, impersonateJwt, annotations.VaultMount, annotations.VaultPath)
 	if err != nil {
-		log.Log.Error(err, "Failed to fetch secret from Vault", "path", kvMount+"/data/test")
+		log.Log.Error(err, "Failed to fetch secret from Vault", "path", annotations.VaultMount + "/data/" + annotations.VaultPath)
 		return ctrl.Result{}, err
 	}
 

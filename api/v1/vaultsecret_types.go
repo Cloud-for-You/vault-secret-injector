@@ -17,6 +17,7 @@ limitations under the License.
 package v1
 
 import (
+	"fmt"
 	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -53,12 +54,14 @@ type VaultSecretStatus struct {
 	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
 	SecretName string `json:"secretName,omitempty"`
+	Message    string `json:"message,omitempty"`
 }
 
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
 // +kubebuilder:printcolumn:name="Secret",type=string,JSONPath=`.status.secretName`
 // +kubebuilder:printcolumn:name="Age",type=date,JSONPath=`.metadata.creationTimestamp`
+// +kubebuilder:printcolumn:name="Message",type=string,JSONPath=`.status.message`
 
 // VaultSecret is the Schema for the vaultsecrets API.
 type VaultSecret struct {
@@ -95,17 +98,16 @@ type VaultSecretAnnotations struct {
 	VaultRefreshInterval time.Duration `json:"vaultRefreshInterval"`
 }
 
-func DefaultAnnotations() VaultSecretAnnotations {
+func defaultAnnotations(namespace string) VaultSecretAnnotations {
 	return VaultSecretAnnotations{
-		VaultMount:           "kv-default",
-		VaultPath:            "secret",
+		VaultMount:           "kv-" + namespace,
 		VaultRefreshInterval: 5 * time.Minute,
 	}
 }
 
 // GetAnnotations parses the annotations from the VaultSecret object.
 func (vs *VaultSecret) ParseAnnotations(meta metav1.ObjectMeta) (VaultSecretAnnotations, error) {
-	annotations := DefaultAnnotations()
+	annotations := defaultAnnotations(meta.Namespace)
 	ann := meta.GetAnnotations()
 
 	if val, ok := ann[AnnotationVaultMount]; ok {
@@ -114,6 +116,8 @@ func (vs *VaultSecret) ParseAnnotations(meta metav1.ObjectMeta) (VaultSecretAnno
 
 	if val, ok := ann[AnnotationVaultPath]; ok {
 		annotations.VaultPath = val
+	} else {
+		return VaultSecretAnnotations{}, fmt.Errorf("missing required annotation: %s", AnnotationVaultPath)
 	}
 
 	if val, ok := ann[AnnotationVaultRefreshInterval]; ok {
