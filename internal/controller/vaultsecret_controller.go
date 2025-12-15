@@ -18,6 +18,7 @@ package controller
 
 import (
 	"context"
+	"time"
 
 	authenticationv1 "k8s.io/api/authentication/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -25,7 +26,6 @@ import (
 	"k8s.io/client-go/kubernetes"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/log"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 
 	cfyczv1 "github.com/cloud-for-you/vault-secret-injector/api/v1"
@@ -54,7 +54,7 @@ type VaultSecretReconciler struct {
 // For more details, check Reconcile and its Result here:
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.21.0/pkg/reconcile
 func (r *VaultSecretReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	_ = logf.FromContext(ctx)
+	log := logf.FromContext(ctx)
 
 	// TODO(user): your logic here
 	var vaultSecret cfyczv1.VaultSecret
@@ -62,42 +62,83 @@ func (r *VaultSecretReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 		// handle error
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
-	log.Log.Info("Reconciling VaultSecret", "name", vaultSecret.Name, "namespace", vaultSecret.Namespace)
+	log.Info("Reconciling VaultSecret", "name", vaultSecret.Name, "namespace", vaultSecret.Namespace)
+
+	// Parse Annotations
+	annotations, err := vaultSecret.ParseAnnotations(vaultSecret.ObjectMeta)
+	if err != nil {
+		log.Error(err, "Failed to parse VaultSecret annotations", "name", vaultSecret.Name, "namespace", vaultSecret.Namespace)
+		return ctrl.Result{}, err
+	}
+	log.Info(annotations.VaultPath)
 
 	// Get Impersonate Service Account Token
 	clientset := kubernetes.NewForConfigOrDie(ctrl.GetConfigOrDie())
 	impersonateJwt, err := getImpersonateSAToken(ctx, clientset, vaultSecret.GetNamespace(), "default", "serviceaccount", int64(600))
 	if err != nil {
-		log.Log.Error(err, "Failed to get impersonated service account token")
+		vaultSecret.Status.Message = "Failed to get impersonated service account token: " + err.Error()
+		if updateErr := r.Status().Update(ctx, &vaultSecret); updateErr != nil {
+			log.Error(updateErr, "Failed to update VaultSecret status")
+			return ctrl.Result{}, updateErr
+		}
 		return ctrl.Result{}, err
 	}
 	vaultlib.LogAudit(impersonateJwt, "Obtained impersonated service account token", map[string]interface{}{"namespace": vaultSecret.GetNamespace(), "serviceAccount": "default"})
-	
+
 	// Create Vault Client
-  vaultClient, err := vaultlib.NewVaultClient()
-  if err != nil {
-    log.Log.Error(err, "Failed to create Vault client")
-    return ctrl.Result{}, err
-  }
+	vaultClient, err := vaultlib.NewVaultClient()
+	if err != nil {
+		vaultSecret.Status.Message = "Failed to create Vault client: " + err.Error()
+		if updateErr := r.Status().Update(ctx, &vaultSecret); updateErr != nil {
+			log.Error(updateErr, "Failed to update VaultSecret status")
+			return ctrl.Result{}, updateErr
+		}
+		return ctrl.Result{}, err
+	}
 
 	// Login to Vault with K8s Auth Method
 	err = vaultlib.VaultLoginWithK8sAuth(ctx, vaultClient, "k8s-kind", impersonateJwt, vaultSecret.GetNamespace())
 	if err != nil {
-		log.Log.Error(err, "Failed to login to Vault")
+		vaultSecret.Status.Message = "Failed to login to Vault: " + err.Error()
+		if updateErr := r.Status().Update(ctx, &vaultSecret); updateErr != nil {
+			log.Error(updateErr, "Failed to update VaultSecret status")
+			return ctrl.Result{}, updateErr
+		}
 		return ctrl.Result{}, err
 	}
 
 	// Fetch data from Vault KV engine
-	kvMount := "kv-test"
-	secretData, err := vaultlib.FetchSecretEngineKV(vaultClient, impersonateJwt, kvMount, "test")
+	secretData, err := vaultlib.FetchSecretEngineKV(vaultClient, impersonateJwt, annotations.VaultMount, annotations.VaultPath)
 	if err != nil {
-		log.Log.Error(err, "Failed to fetch secret from Vault", "path", kvMount+"/data/test")
+		vaultSecret.Status.Message = "Failed to fetch secret from Vault: " + err.Error()
+		if updateErr := r.Status().Update(ctx, &vaultSecret); updateErr != nil {
+			log.Error(updateErr, "Failed to update VaultSecret status")
+			return ctrl.Result{}, updateErr
+		}
 		return ctrl.Result{}, err
 	}
 
 	// Print fetched data in JSON format (only for demonstration; avoid in production)
-	log.Log.Info("Fetched secret data", "data", secretData)
+	log.Info("Fetched secret data", "data", secretData)
 
+	// Create or Update Kubernetes Secret and update VaultSecret Status
+	vaultSecret.Status.LastUpdated = metav1.Now().Format(time.RFC3339)
+	if updateErr := r.Status().Update(ctx, &vaultSecret); updateErr != nil {
+		log.Error(updateErr, "Failed to update VaultSecret status with LastUpdated")
+		return ctrl.Result{}, updateErr
+	}
+
+	// Update VaultSecret Status
+	vaultSecret.Status.Message = "Successfully fetched secret from Vault"
+	if updateErr := r.Status().Update(ctx, &vaultSecret); updateErr != nil {
+		log.Error(updateErr, "Failed to update VaultSecret status")
+		return ctrl.Result{}, updateErr
+	}
+
+	if annotations.VaultRefreshInterval > 0 {
+		// Requeue after the specified refresh interval
+		return ctrl.Result{RequeueAfter: annotations.VaultRefreshInterval}, nil
+	}
 	return ctrl.Result{}, nil
 }
 

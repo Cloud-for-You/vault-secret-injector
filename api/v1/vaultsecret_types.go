@@ -17,6 +17,9 @@ limitations under the License.
 package v1
 
 import (
+	"fmt"
+	"time"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -50,13 +53,17 @@ type VaultSecretSpec struct {
 type VaultSecretStatus struct {
 	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
-	SecretName string `json:"secretName,omitempty"`
+	SecretName  string `json:"secretName,omitempty"`
+	LastUpdated string `json:"lastUpdated,omitempty"`
+	Message     string `json:"message,omitempty"`
 }
 
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
 // +kubebuilder:printcolumn:name="Secret",type=string,JSONPath=`.status.secretName`
+// +kubebuilder:printcolumn:name="Last Updated",type=string,JSONPath=`.status.lastUpdated`
 // +kubebuilder:printcolumn:name="Age",type=date,JSONPath=`.metadata.creationTimestamp`
+// +kubebuilder:printcolumn:name="Message",type=string,JSONPath=`.status.message`
 
 // VaultSecret is the Schema for the vaultsecrets API.
 type VaultSecret struct {
@@ -78,4 +85,50 @@ type VaultSecretList struct {
 
 func init() {
 	SchemeBuilder.Register(&VaultSecret{}, &VaultSecretList{})
+}
+
+const (
+	AnnotationVaultMount           = "vault.hashicorp.com/mount"
+	AnnotationVaultPath            = "vault.hashicorp.com/path"
+	AnnotationVaultRefreshInterval = "vault.hashicorp.com/refresh-interval"
+)
+
+// VaultSecretAnnotation a list of VaultSecret.
+type VaultSecretAnnotations struct {
+	VaultPath            string        `json:"vaultPath"`
+	VaultMount           string        `json:"vaultMount"`
+	VaultRefreshInterval time.Duration `json:"vaultRefreshInterval"`
+}
+
+func defaultAnnotations(namespace string) VaultSecretAnnotations {
+	return VaultSecretAnnotations{
+		VaultMount:           "kv-" + namespace,
+		VaultRefreshInterval: 5 * time.Minute,
+	}
+}
+
+// GetAnnotations parses the annotations from the VaultSecret object.
+func (vs *VaultSecret) ParseAnnotations(meta metav1.ObjectMeta) (VaultSecretAnnotations, error) {
+	annotations := defaultAnnotations(meta.Namespace)
+	ann := meta.GetAnnotations()
+
+	if val, ok := ann[AnnotationVaultMount]; ok {
+		annotations.VaultMount = val
+	}
+
+	if val, ok := ann[AnnotationVaultPath]; ok {
+		annotations.VaultPath = val
+	} else {
+		return VaultSecretAnnotations{}, fmt.Errorf("missing required annotation: %s", AnnotationVaultPath)
+	}
+
+	if val, ok := ann[AnnotationVaultRefreshInterval]; ok {
+		duration, err := time.ParseDuration(val)
+		if err != nil {
+			return VaultSecretAnnotations{}, err
+		}
+		annotations.VaultRefreshInterval = duration
+	}
+
+	return annotations, nil
 }
