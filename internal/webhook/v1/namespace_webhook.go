@@ -67,22 +67,22 @@ func (v *NamespaceCustomValidator) ValidateCreate(ctx context.Context, obj runti
 	}
 	namespacelog.Info("Validation for Namespace upon creation", "name", namespace.GetName())
 
-  jwt, err := os.ReadFile("/var/run/secrets/kubernetes.io/serviceaccount/token")
-  if err != nil {
-    namespacelog.Error(err, "Failed to read ServiceAccount JWT token")
-    return nil, err
-  }
+	jwt, err := os.ReadFile("/var/run/secrets/kubernetes.io/serviceaccount/token")
+	if err != nil {
+		namespacelog.Error(err, "Failed to read ServiceAccount JWT token")
+		return nil, err
+	}
 	role := os.Getenv("VAULT_ROLE")
 	mount := os.Getenv("VAULT_K8S_AUTH_MOUNT")
 	if mount == "" {
-	  mount = "kubernetes"
+		mount = "kubernetes"
 	}
 
-  vaultClient, err := vaultlib.NewVaultClient()
-  if err != nil {
-    namespacelog.Error(err, "Failed to create Vault client")
-    return nil, err
-  }
+	vaultClient, err := vaultlib.NewVaultClient()
+	if err != nil {
+		namespacelog.Error(err, "Failed to create Vault client")
+		return nil, err
+	}
 
 	err = vaultlib.VaultLoginWithK8sAuth(ctx, vaultClient, mount, string(jwt), role)
 	if err != nil {

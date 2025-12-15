@@ -16,7 +16,9 @@ func NewVaultClient() (*vaultapi.Client, error) {
 	cfg := vaultapi.DefaultConfig()
 	cfg.Address = os.Getenv("VAULT_ADDR")
 	if os.Getenv("VAULT_TLS_SKIP_VERIFY") == "true" {
-		cfg.ConfigureTLS(&vaultapi.TLSConfig{Insecure: true})
+		if err := cfg.ConfigureTLS(&vaultapi.TLSConfig{Insecure: true}); err != nil {
+			return nil, fmt.Errorf("configure vault TLS: %w", err)
+		}
 	}
 
 	return vaultapi.NewClient(cfg)
@@ -31,11 +33,11 @@ func NewVaultClient() (*vaultapi.Client, error) {
 // - role: the Vault role to authenticate as
 // Returns: error if login fails
 func VaultLoginWithK8sAuth(ctx context.Context, client *vaultapi.Client, mount string, jwt string, role string) error {
-  auth, err := vaultk8s.NewKubernetesAuth(
-    role,
-    vaultk8s.WithServiceAccountToken(jwt),
+	auth, err := vaultk8s.NewKubernetesAuth(
+		role,
+		vaultk8s.WithServiceAccountToken(jwt),
 		vaultk8s.WithMountPath(mount),
-  )
+	)
 	if err != nil {
 		return err
 	}

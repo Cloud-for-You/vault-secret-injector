@@ -53,9 +53,9 @@ type VaultSecretSpec struct {
 type VaultSecretStatus struct {
 	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
-	SecretName string `json:"secretName,omitempty"`
+	SecretName  string `json:"secretName,omitempty"`
 	LastUpdated string `json:"lastUpdated,omitempty"`
-	Message    string `json:"message,omitempty"`
+	Message     string `json:"message,omitempty"`
 }
 
 // +kubebuilder:object:root=true
@@ -95,8 +95,8 @@ const (
 
 // VaultSecretAnnotation a list of VaultSecret.
 type VaultSecretAnnotations struct {
-	VaultPath            string `json:"vaultPath"`
-	VaultMount           string `json:"vaultMount"`
+	VaultPath            string        `json:"vaultPath"`
+	VaultMount           string        `json:"vaultMount"`
 	VaultRefreshInterval time.Duration `json:"vaultRefreshInterval"`
 }
 
@@ -129,6 +129,6 @@ func (vs *VaultSecret) ParseAnnotations(meta metav1.ObjectMeta) (VaultSecretAnno
 		}
 		annotations.VaultRefreshInterval = duration
 	}
-	
+
 	return annotations, nil
 }

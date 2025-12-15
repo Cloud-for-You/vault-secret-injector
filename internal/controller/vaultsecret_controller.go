@@ -65,8 +65,8 @@ func (r *VaultSecretReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 	}
 	log.Log.Info("Reconciling VaultSecret", "name", vaultSecret.Name, "namespace", vaultSecret.Namespace)
 
-  // Parse Annotations
-  annotations, err := vaultSecret.ParseAnnotations(vaultSecret.ObjectMeta)
+	// Parse Annotations
+	annotations, err := vaultSecret.ParseAnnotations(vaultSecret.ObjectMeta)
 	if err != nil {
 		log.Log.Error(err, "Failed to parse VaultSecret annotations", "name", vaultSecret.Name, "namespace", vaultSecret.Namespace)
 		return ctrl.Result{}, err
@@ -85,17 +85,17 @@ func (r *VaultSecretReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 		return ctrl.Result{}, err
 	}
 	vaultlib.LogAudit(impersonateJwt, "Obtained impersonated service account token", map[string]interface{}{"namespace": vaultSecret.GetNamespace(), "serviceAccount": "default"})
-	
+
 	// Create Vault Client
-  vaultClient, err := vaultlib.NewVaultClient()
-  if err != nil {
+	vaultClient, err := vaultlib.NewVaultClient()
+	if err != nil {
 		vaultSecret.Status.Message = "Failed to create Vault client: " + err.Error()
 		if updateErr := r.Status().Update(ctx, &vaultSecret); updateErr != nil {
 			log.Log.Error(updateErr, "Failed to update VaultSecret status")
 			return ctrl.Result{}, updateErr
 		}
-    return ctrl.Result{}, err
-  }
+		return ctrl.Result{}, err
+	}
 
 	// Login to Vault with K8s Auth Method
 	err = vaultlib.VaultLoginWithK8sAuth(ctx, vaultClient, "k8s-kind", impersonateJwt, vaultSecret.GetNamespace())
@@ -122,7 +122,7 @@ func (r *VaultSecretReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 	// Print fetched data in JSON format (only for demonstration; avoid in production)
 	log.Log.Info("Fetched secret data", "data", secretData)
 
-  // Create or Update Kubernetes Secret and update VaultSecret Status
+	// Create or Update Kubernetes Secret and update VaultSecret Status
 	vaultSecret.Status.LastUpdated = metav1.Now().Format(time.RFC3339)
 	if updateErr := r.Status().Update(ctx, &vaultSecret); updateErr != nil {
 		log.Log.Error(updateErr, "Failed to update VaultSecret status with LastUpdated")
@@ -136,7 +136,7 @@ func (r *VaultSecretReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 		return ctrl.Result{}, updateErr
 	}
 
-  if annotations.VaultRefreshInterval > 0 {
+	if annotations.VaultRefreshInterval > 0 {
 		// Requeue after the specified refresh interval
 		return ctrl.Result{RequeueAfter: annotations.VaultRefreshInterval}, nil
 	}
