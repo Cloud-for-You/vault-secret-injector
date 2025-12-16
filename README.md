@@ -62,6 +62,28 @@ path "sys/internal/ui/mounts"   { capabilities = ["read"] }
 path "sys/internal/ui/mounts/*" { capabilities = ["read"] }
 ```
 
+### Hashicorp Vault Kubernetes role
+```shell
+kubectl port-forward -n hscp-vault svc/vault 8200:8200
+
+export VAULT_ADDR="http://localhost:8200"
+export VAULT_TOKEN="hvs. ......."
+export CLUSTER_NAME="k8s-kind"
+export K8S_HOST="https://$(kubectl get svc -n default kubernetes -o jsonpath='{.spec.clusterIP}'):443"
+export K8S_JWT=$(kubectl get secret -n vault-secret-injector-system vault-secret-injector-controller-manager-token -o jsonpath="{.data.token}" | base64 -d)
+kubectl get secret -n vault-secret-injector-system vault-secret-injector-controller-manager-token -o jsonpath="{.data.ca\.crt}" | base64 -d > ca.crt
+
+vault auth enable -path=${CLUSTER_NAME} kubernetes
+vault write auth/${CLUSTER_NAME}/config token_reviewer_jwt=$K8S_JWT kubernetes_host=$K8S_HOST kubernetes_ca_cert=@ca.crt
+vault write auth/${CLUSTER_NAME}/role/vault-secret-injector \
+  bound_service_account_names=vault-secret-injector-controller-manager \
+  bound_service_account_namespaces=vault-secret-injector-system \
+  policies=vault-secret-injector \
+  audience=https://kubernetes.default.svc.cluster.local \
+  alias_name_source=serviceaccount_uid
+```
+
+
 ### Reconciliation Custom CRD
 Operator implementuje reconciliation smyčku pro VaultSecret CRD, která zajišťuje kontinuální synchronizaci tajných údajů z Vault do Kubernetes Secrets. Příkladem použití je VaultSecret CRD:
 

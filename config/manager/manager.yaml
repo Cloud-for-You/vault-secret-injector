@@ -69,7 +69,7 @@ spec:
           - name: VAULT_K8S_AUTH_MOUNT
             value: "k8s-kind"
           - name: VAULT_ROLE
-            value: "policy-manager"
+            value: "vault-secret-injector"
           - name: VAULT_TLS_SKIP_VERIFY
             value: "true"
         image: controller:latest
