@@ -97,3 +97,20 @@ func FetchSecretEngineKV(client *vaultapi.Client, jwt, mount, path string) (map[
 
 	return result, nil
 }
+
+// FetchSecretValue fetches a single value from Vault KV v2 engine at the given path.
+// Assumes the secret has at least one key-value pair and returns the value of the first key.
+func FetchSecretValue(client *vaultapi.Client, jwt, mount, path string) ([]byte, error) {
+	data, err := FetchSecretEngineKV(client, jwt, mount, path)
+	if err != nil {
+		return nil, err
+	}
+	if len(data) == 0 {
+		return nil, fmt.Errorf("no data found at path %s", path)
+	}
+	// Return the value of the first key
+	for _, v := range data {
+		return v, nil
+	}
+	return nil, nil // shouldn't reach
+}

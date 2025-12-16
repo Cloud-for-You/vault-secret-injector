@@ -18,7 +18,6 @@ package v1
 
 import (
 	"context"
-	"fmt"
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
@@ -42,7 +41,7 @@ type VaultSecretSpec struct {
 	// +kubebuilder:default:=false
 	Immutable bool `json:"immutable,omitempty"`
 	// StringData is an example field of VaultSecret. Edit vaultsecret_types.go to remove/update
-	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:Optional
 	StringData map[string]string `json:"stringData"`
 	// stringData allows specifying non-binary secret data in string form. It is
 	// provided as a write-only input field for convenience. All keys and values
@@ -136,8 +135,6 @@ func (vs *VaultSecret) ParseAnnotations(meta metav1.ObjectMeta) (VaultSecretAnno
 
 	if val, ok := ann[AnnotationVaultPath]; ok {
 		annotations.VaultPath = val
-	} else {
-		return VaultSecretAnnotations{}, fmt.Errorf("missing required annotation: %s", AnnotationVaultPath)
 	}
 
 	if val, ok := ann[AnnotationVaultRefreshInterval]; ok {

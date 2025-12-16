@@ -18,6 +18,8 @@ package controller
 
 import (
 	"context"
+	"fmt"
+	"strings"
 	"time"
 
 	authenticationv1 "k8s.io/api/authentication/v1"
@@ -72,6 +74,13 @@ func (r *VaultSecretReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 	}
 	log.Info(annotations.VaultPath)
 
+	// Validate configuration
+	if annotations.VaultPath == "" && len(vaultSecret.Spec.StringData) == 0 {
+		err := fmt.Errorf("neither vault path annotation nor stringData specified")
+		log.Error(err, "Invalid configuration", "name", vaultSecret.Name, "namespace", vaultSecret.Namespace)
+		return ctrl.Result{}, err
+	}
+
 	// Get Impersonate Service Account Token
 	clientset := kubernetes.NewForConfigOrDie(ctrl.GetConfigOrDie())
 	impersonateJwt, err := getImpersonateSAToken(ctx, clientset, vaultSecret.GetNamespace(), "default", "serviceaccount", int64(600))
@@ -108,14 +117,53 @@ func (r *VaultSecretReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 	}
 
 	// Fetch data from Vault KV engine
-	secretData, err := vaultlib.FetchSecretEngineKV(vaultClient, impersonateJwt, annotations.VaultMount, annotations.VaultPath)
-	if err != nil {
-		vaultSecret.Status.Message = "Failed to fetch secret from Vault: " + err.Error()
-		if updateErr := r.Status().Update(ctx, &vaultSecret); updateErr != nil {
-			log.Error(updateErr, "Failed to update VaultSecret status")
-			return ctrl.Result{}, updateErr
+	var secretData map[string][]byte
+	if annotations.VaultPath != "" {
+		secretData, err = vaultlib.FetchSecretEngineKV(vaultClient, impersonateJwt, annotations.VaultMount, annotations.VaultPath)
+		if err != nil {
+			vaultSecret.Status.Message = "Failed to fetch secret from Vault: " + err.Error()
+			if updateErr := r.Status().Update(ctx, &vaultSecret); updateErr != nil {
+				log.Error(updateErr, "Failed to update VaultSecret status")
+				return ctrl.Result{}, updateErr
+			}
+			return ctrl.Result{}, err
 		}
-		return ctrl.Result{}, err
+	} else {
+		secretData = make(map[string][]byte)
+		for secretKey, vaultSpec := range vaultSecret.Spec.StringData {
+			parts := strings.Split(vaultSpec, "@")
+			if len(parts) != 2 {
+				err := fmt.Errorf("invalid stringData format for key %s: expected <vaultPath>@<key>", secretKey)
+				vaultSecret.Status.Message = "Invalid stringData format: " + err.Error()
+				if updateErr := r.Status().Update(ctx, &vaultSecret); updateErr != nil {
+					log.Error(updateErr, "Failed to update VaultSecret status")
+					return ctrl.Result{}, updateErr
+				}
+				return ctrl.Result{}, err
+			}
+			vaultPath := parts[0]
+			keyInVault := parts[1]
+			data, err := vaultlib.FetchSecretEngineKV(vaultClient, impersonateJwt, annotations.VaultMount, vaultPath)
+			if err != nil {
+				vaultSecret.Status.Message = "Failed to fetch secret from Vault: " + err.Error()
+				if updateErr := r.Status().Update(ctx, &vaultSecret); updateErr != nil {
+					log.Error(updateErr, "Failed to update VaultSecret status")
+					return ctrl.Result{}, updateErr
+				}
+				return ctrl.Result{}, err
+			}
+			value, ok := data[keyInVault]
+			if !ok {
+				err := fmt.Errorf("key %s not found in vault path %s", keyInVault, vaultPath)
+				vaultSecret.Status.Message = "Key not found in Vault: " + err.Error()
+				if updateErr := r.Status().Update(ctx, &vaultSecret); updateErr != nil {
+					log.Error(updateErr, "Failed to update VaultSecret status")
+					return ctrl.Result{}, updateErr
+				}
+				return ctrl.Result{}, err
+			}
+			secretData[secretKey] = value
+		}
 	}
 
 	// Create or Update Kubernetes Secret and update VaultSecret Status
