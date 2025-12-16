@@ -93,15 +93,15 @@ func init() {
 
 const (
 	// Specify required mount point in Vault to fetch the secret from.
-	AnnotationVaultMount           = "vault.hashicorp.com/mount"
+	AnnotationVaultMount = "vault.hashicorp.com/mount"
 	// Specify the path in Vault to fetch the secret from.
 	// If specified fetch all keys from this path.
 	// If not specified, fetch only data from keys defined in spec.stringData
-	AnnotationVaultPath            = "vault.hashicorp.com/path"
+	AnnotationVaultPath = "vault.hashicorp.com/path"
 	// Specify how often to refresh the secret from Vault.
 	AnnotationVaultRefreshInterval = "vault.hashicorp.com/refresh-interval"
 	// Specify the name of the Kubernetes Secret to create/update.
-	AnnotationVaultSecretName      = "vault.hashicorp.com/secret-name"
+	AnnotationVaultSecretName = "vault.hashicorp.com/secret-name"
 )
 
 // VaultSecretAnnotation a list of VaultSecret.
