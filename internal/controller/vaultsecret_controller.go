@@ -118,9 +118,6 @@ func (r *VaultSecretReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 		return ctrl.Result{}, err
 	}
 
-	// Print fetched data in JSON format (only for demonstration; avoid in production)
-	log.Info("Fetched secret data", "data", secretData)
-
 	// Create or Update Kubernetes Secret and update VaultSecret Status
 	err = vaultSecret.CreateOrUpdateK8sSecret(ctx, r.Client, secretData)
 	if err != nil {

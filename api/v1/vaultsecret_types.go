@@ -158,6 +158,9 @@ func (vs *VaultSecret) CreateOrUpdateK8sSecret(ctx context.Context, c client.Cli
 	}
 	secretName := annotations.VaultSecretName
 	secretNamespace := vs.Namespace
+	
+	// Add ownereship reference
+	ownerRef := metav1.NewControllerRef(vs, vs.GroupVersionKind())
 
 	k8sSecret := &corev1.Secret{}
 	err = c.Get(ctx, client.ObjectKey{Name: secretName, Namespace: secretNamespace}, k8sSecret)
@@ -167,6 +170,9 @@ func (vs *VaultSecret) CreateOrUpdateK8sSecret(ctx context.Context, c client.Cli
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      secretName,
 				Namespace: secretNamespace,
+				OwnerReferences: []metav1.OwnerReference{
+					*ownerRef,
+				},
 			},
 			Data:      secretData,
 			Type:      corev1.SecretType(vs.Spec.Type),
