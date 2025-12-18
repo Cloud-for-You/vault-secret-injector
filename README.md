@@ -101,7 +101,7 @@ Operator podporuje dva způsoby přístupu k tajným údajům z Vault:
    - Operator načte hodnotu specifického klíče z dané cesty ve Vault a uloží ji do Kubernetes Secret pod zadaným klíčem.
    - Příklad: Načtení hesla z `myapp1/config` pod klíčem `DATA1` a z `myapp2/config` pod klíčem `DATA2`.
 
-Musí být definována buď anotace `vault.hashicorp.com/path`, nebo `spec.stringData`. Nelze kombinovat obě metody v jednom VaultSecret.
+Musí být definována buď anotace `vault.hashicorp.com/path`, nebo `spec.stringData`. Nelze kombinovat obě metody v jednom VaultSecret. Annotace má přednost před specifikovanými klíči.
 
 #### Příklady použití
 
