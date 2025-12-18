@@ -68,8 +68,8 @@ func DeleteSecretEngineKV(ctx *k8siov1.Namespace, client *vaultapi.Client, jwt s
 // - jwt: the JWT token for auditing
 // - mount: the mount path of the KV engine
 // - path: the path to the secret in Vault
-// Returns: the secret data as a map or error
-func FetchSecretEngineKV(client *vaultapi.Client, jwt, mount, path string) (map[string]interface{}, error) {
+// Returns: the secret data as map[string][]byte or error
+func FetchSecretEngineKV(client *vaultapi.Client, jwt, mount, path string) (map[string][]byte, error) {
 	secretPath := fmt.Sprintf("%s/data/%s", mount, path)
 	secret, err := client.Logical().Read(secretPath)
 	if err != nil {
@@ -84,7 +84,33 @@ func FetchSecretEngineKV(client *vaultapi.Client, jwt, mount, path string) (map[
 		return nil, fmt.Errorf("invalid data format at %s", secretPath)
 	}
 
+	result := make(map[string][]byte)
+	for k, v := range data {
+		str, ok := v.(string)
+		if !ok {
+			return nil, fmt.Errorf("value for key %s is not a string", k)
+		}
+		result[k] = []byte(str)
+	}
+
 	LogAudit(jwt, "Fetched secret from Vault KV engine", map[string]interface{}{"mount": mount, "path": path})
 
-	return data, nil
+	return result, nil
+}
+
+// FetchSecretValue fetches a single value from Vault KV v2 engine at the given path.
+// Assumes the secret has at least one key-value pair and returns the value of the first key.
+func FetchSecretValue(client *vaultapi.Client, jwt, mount, path string) ([]byte, error) {
+	data, err := FetchSecretEngineKV(client, jwt, mount, path)
+	if err != nil {
+		return nil, err
+	}
+	if len(data) == 0 {
+		return nil, fmt.Errorf("no data found at path %s", path)
+	}
+	// Return the value of the first key
+	for _, v := range data {
+		return v, nil
+	}
+	return nil, nil // shouldn't reach
 }

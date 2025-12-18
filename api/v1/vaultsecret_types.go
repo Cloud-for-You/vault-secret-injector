@@ -17,10 +17,13 @@ limitations under the License.
 package v1
 
 import (
-	"fmt"
+	"context"
 	"time"
 
+	corev1 "k8s.io/api/core/v1"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 // EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
@@ -38,7 +41,7 @@ type VaultSecretSpec struct {
 	// +kubebuilder:default:=false
 	Immutable bool `json:"immutable,omitempty"`
 	// StringData is an example field of VaultSecret. Edit vaultsecret_types.go to remove/update
-	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:Optional
 	StringData map[string]string `json:"stringData"`
 	// stringData allows specifying non-binary secret data in string form. It is
 	// provided as a write-only input field for convenience. All keys and values
@@ -88,9 +91,16 @@ func init() {
 }
 
 const (
-	AnnotationVaultMount           = "vault.hashicorp.com/mount"
-	AnnotationVaultPath            = "vault.hashicorp.com/path"
+	// Specify required mount point in Vault to fetch the secret from.
+	AnnotationVaultMount = "vault.hashicorp.com/mount"
+	// Specify the path in Vault to fetch the secret from.
+	// If specified fetch all keys from this path.
+	// If not specified, fetch only data from keys defined in spec.stringData
+	AnnotationVaultPath = "vault.hashicorp.com/path"
+	// Specify how often to refresh the secret from Vault.
 	AnnotationVaultRefreshInterval = "vault.hashicorp.com/refresh-interval"
+	// Specify the name of the Kubernetes Secret to create/update.
+	AnnotationVaultSecretName = "vault.hashicorp.com/secret-name"
 )
 
 // VaultSecretAnnotation a list of VaultSecret.
@@ -98,6 +108,7 @@ type VaultSecretAnnotations struct {
 	VaultPath            string        `json:"vaultPath"`
 	VaultMount           string        `json:"vaultMount"`
 	VaultRefreshInterval time.Duration `json:"vaultRefreshInterval"`
+	VaultSecretName      string        `json:"vaultSecretName"`
 }
 
 func defaultAnnotations(namespace string) VaultSecretAnnotations {
@@ -116,10 +127,14 @@ func (vs *VaultSecret) ParseAnnotations(meta metav1.ObjectMeta) (VaultSecretAnno
 		annotations.VaultMount = val
 	}
 
+	if val, ok := ann[AnnotationVaultSecretName]; ok {
+		annotations.VaultSecretName = val
+	} else {
+		annotations.VaultSecretName = meta.Name
+	}
+
 	if val, ok := ann[AnnotationVaultPath]; ok {
 		annotations.VaultPath = val
-	} else {
-		return VaultSecretAnnotations{}, fmt.Errorf("missing required annotation: %s", AnnotationVaultPath)
 	}
 
 	if val, ok := ann[AnnotationVaultRefreshInterval]; ok {
@@ -131,4 +146,50 @@ func (vs *VaultSecret) ParseAnnotations(meta metav1.ObjectMeta) (VaultSecretAnno
 	}
 
 	return annotations, nil
+}
+
+func (vs *VaultSecret) CreateOrUpdateK8sSecret(ctx context.Context, c client.Client, secretData map[string][]byte) error {
+	annotations, err := vs.ParseAnnotations(vs.ObjectMeta)
+	if err != nil {
+		return err
+	}
+	secretName := annotations.VaultSecretName
+	secretNamespace := vs.Namespace
+
+	// Add ownereship reference
+	ownerRef := metav1.NewControllerRef(vs, vs.GroupVersionKind())
+
+	k8sSecret := &corev1.Secret{}
+	err = c.Get(ctx, client.ObjectKey{Name: secretName, Namespace: secretNamespace}, k8sSecret)
+	if err != nil {
+		// Secret does not exist, create it
+		newSecret := &corev1.Secret{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      secretName,
+				Namespace: secretNamespace,
+				OwnerReferences: []metav1.OwnerReference{
+					*ownerRef,
+				},
+			},
+			Data:      secretData,
+			Type:      corev1.SecretType(vs.Spec.Type),
+			Immutable: &vs.Spec.Immutable,
+		}
+		if err := c.Create(ctx, newSecret); err != nil {
+			return err
+		}
+		vs.Status.SecretName = secretName
+		return nil
+	}
+
+	// Secret exists, update it
+	k8sSecret.Data = secretData
+	k8sSecret.Type = corev1.SecretType(vs.Spec.Type)
+	k8sSecret.Immutable = &vs.Spec.Immutable
+
+	if err := c.Update(ctx, k8sSecret); err != nil {
+		return err
+	}
+	vs.Status.SecretName = secretName
+	return nil
 }
