@@ -155,7 +155,7 @@ func (vs *VaultSecret) CreateOrUpdateK8sSecret(ctx context.Context, c client.Cli
 	}
 	secretName := annotations.VaultSecretName
 	secretNamespace := vs.Namespace
-	
+
 	// Add ownereship reference
 	ownerRef := metav1.NewControllerRef(vs, vs.GroupVersionKind())
 

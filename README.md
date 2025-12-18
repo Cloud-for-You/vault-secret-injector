@@ -85,17 +85,55 @@ vault write auth/${CLUSTER_NAME}/role/vault-secret-injector \
 
 
 ### Reconciliation Custom CRD
-Operator implementuje reconciliation smyčku pro VaultSecret CRD, která zajišťuje kontinuální synchronizaci tajných údajů z Vault do Kubernetes Secrets. Příkladem použití je VaultSecret CRD:
+Operator implementuje reconciliation smyčku pro VaultSecret CRD, která zajišťuje kontinuální synchronizaci tajných údajů z Vault do Kubernetes Secrets.
 
+#### Možnosti přístupu k citlivým datům
+
+Operator podporuje dva způsoby přístupu k tajným údajům z Vault:
+
+1. **Načtení všech klíčů z cesty (path annotation)**:
+   - Použijte anotaci `vault.hashicorp.com/path` s cestou ve Vault.
+   - Operator načte všechny klíče z této cesty a vytvoří Kubernetes Secret s odpovídajícími daty.
+   - Příklad: Načtení všech konfigurací z cesty `myapp/config`.
+
+2. **Načtení specifických klíčů (stringData)**:
+   - Použijte pole `spec.stringData` ve formátu `data_key: <vault_path>@<key_in_vault>`.
+   - Operator načte hodnotu specifického klíče z dané cesty ve Vault a uloží ji do Kubernetes Secret pod zadaným klíčem.
+   - Příklad: Načtení hesla z `myapp1/config` pod klíčem `DATA1` a z `myapp2/config` pod klíčem `DATA2`.
+
+Musí být definována buď anotace `vault.hashicorp.com/path`, nebo `spec.stringData`. Nelze kombinovat obě metody v jednom VaultSecret.
+
+#### Příklady použití
+
+**Načtení všech klíčů z cesty:**
 ```yaml
 apiVersion: cfy.cz/v1
 kind: VaultSecret
 metadata:
-  name: vaultsecret-sample
+  name: vaultsecret-all-keys
+  annotations:
+    vault.hashicorp.com/path: "myapp/config"
+spec:
+  type: Opaque
+```
+
+**Načtení specifických klíčů:**
+```yaml
+apiVersion: cfy.cz/v1
+kind: VaultSecret
+metadata:
+  name: vaultsecret-specific-keys
 spec:
   stringData:
-    secret-key: secret/data/myapp/config#password
+    USERNAME: "myapp1/config@DATA1"
+    PASSWORD: "myapp2/config@DATA2"
+  type: Opaque
 ```
+
+**Další anotace:**
+- `vault.hashicorp.com/mount`: Určuje mount point ve Vault (výchozí: `kv-{namespace}`)
+- `vault.hashicorp.com/refresh-interval`: Interval pro automatické obnovení dat (výchozí: 5 minut)
+- `vault.hashicorp.com/secret-name`: Název vytvořeného Kubernetes Secret (výchozí: název VaultSecret)
 
 ## Getting Started
 
