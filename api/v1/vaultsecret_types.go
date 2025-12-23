@@ -50,6 +50,9 @@ type VaultSecretSpec struct {
 	// +kubebuilder:validation:Optional
 	// +kubebuilder:default:=Opaque
 	Type string `json:"type,omitempty"`
+	// list of other CRD object for rollout/restart purposes
+	// +kubebuilder:validation:Optional
+	RestartObjectsRef []RestartOjectRef `json:"restartObjectsRef,omitempty"`
 }
 
 // VaultSecretStatus defines the observed state of VaultSecret.
@@ -88,6 +91,14 @@ type VaultSecretList struct {
 
 func init() {
 	SchemeBuilder.Register(&VaultSecret{}, &VaultSecretList{})
+}
+
+type RestartOjectRef struct {
+	// +kubebuilder:validation:Enum=apps/v1
+	APIVersion string `json:"apiVersion"`
+	// +kubebuilder:validation:Enum=Deployment;StatefulSet;DaemonSet
+	Kind string `json:"kind"`
+	Name string `json:"name"`
 }
 
 const (

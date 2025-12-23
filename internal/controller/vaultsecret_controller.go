@@ -20,7 +20,6 @@ import (
 	"context"
 	"fmt"
 	"strings"
-	"time"
 
 	authenticationv1 "k8s.io/api/authentication/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -177,13 +176,6 @@ func (r *VaultSecretReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 		return ctrl.Result{}, err
 	}
 	log.Info("Successfully created or updated Kubernetes Secret")
-
-	// Update LastUpdated timestamp
-	vaultSecret.Status.LastUpdated = metav1.Now().Format(time.RFC3339)
-	if updateErr := r.Status().Update(ctx, &vaultSecret); updateErr != nil {
-		log.Error(updateErr, "Failed to update VaultSecret status with LastUpdated")
-		return ctrl.Result{}, updateErr
-	}
 
 	if annotations.VaultRefreshInterval > 0 {
 		// Requeue after the specified refresh interval
