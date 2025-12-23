@@ -97,8 +97,8 @@ type RestartOjectRef struct {
 	// +kubebuilder:validation:Enum=apps/v1
 	APIVersion string `json:"apiVersion"`
 	// +kubebuilder:validation:Enum=Deployment;StatefulSet;DaemonSet
-	Kind      string `json:"kind"`
-	Name      string `json:"name"`
+	Kind string `json:"kind"`
+	Name string `json:"name"`
 }
 
 const (
