@@ -167,7 +167,7 @@ func (r *VaultSecretReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 	}
 
 	// Create or Update Kubernetes Secret and update VaultSecret Status
-	err = vaultSecret.CreateOrUpdateK8sSecret(ctx, r.Client, secretData)
+	changed, err := vaultSecret.CreateOrUpdateK8sSecret(ctx, r.Client, secretData)
 	if err != nil {
 		vaultSecret.Status.Message = "Failed to create or update Kubernetes Secret: " + err.Error()
 		if updateErr := r.Status().Update(ctx, &vaultSecret); updateErr != nil {
@@ -178,10 +178,12 @@ func (r *VaultSecretReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 	}
 	log.Info("Successfully created or updated Kubernetes Secret")
 
-	// Update LastUpdated timestamp
-	vaultSecret.Status.LastUpdated = metav1.Now().Format(time.RFC3339)
+	// Update LastUpdated timestamp only if data changed
+	if changed {
+		vaultSecret.Status.LastUpdated = metav1.Now().Format(time.RFC3339)
+	}
 	if updateErr := r.Status().Update(ctx, &vaultSecret); updateErr != nil {
-		log.Error(updateErr, "Failed to update VaultSecret status with LastUpdated")
+		log.Error(updateErr, "Failed to update VaultSecret status")
 		return ctrl.Result{}, updateErr
 	}
 
