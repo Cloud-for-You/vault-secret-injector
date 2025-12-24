@@ -18,6 +18,7 @@ package v1
 
 import (
 	"context"
+	"reflect"
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
@@ -159,10 +160,10 @@ func (vs *VaultSecret) ParseAnnotations(meta metav1.ObjectMeta) (VaultSecretAnno
 	return annotations, nil
 }
 
-func (vs *VaultSecret) CreateOrUpdateK8sSecret(ctx context.Context, c client.Client, secretData map[string][]byte) error {
+func (vs *VaultSecret) CreateOrUpdateK8sSecret(ctx context.Context, c client.Client, secretData map[string][]byte) (bool, error) {
 	annotations, err := vs.ParseAnnotations(vs.ObjectMeta)
 	if err != nil {
-		return err
+		return false, err
 	}
 	secretName := annotations.VaultSecretName
 	secretNamespace := vs.Namespace
@@ -187,20 +188,27 @@ func (vs *VaultSecret) CreateOrUpdateK8sSecret(ctx context.Context, c client.Cli
 			Immutable: &vs.Spec.Immutable,
 		}
 		if err := c.Create(ctx, newSecret); err != nil {
-			return err
+			return false, err
 		}
 		vs.Status.SecretName = secretName
-		return nil
+		return true, nil
 	}
 
-	// Secret exists, update it
+	// Secret exists, check if data changed
+	if reflect.DeepEqual(k8sSecret.Data, secretData) && k8sSecret.Type == corev1.SecretType(vs.Spec.Type) && *k8sSecret.Immutable == vs.Spec.Immutable {
+		// No change needed
+		vs.Status.SecretName = secretName
+		return false, nil
+	}
+
+	// Update it
 	k8sSecret.Data = secretData
 	k8sSecret.Type = corev1.SecretType(vs.Spec.Type)
 	k8sSecret.Immutable = &vs.Spec.Immutable
 
 	if err := c.Update(ctx, k8sSecret); err != nil {
-		return err
+		return false, err
 	}
 	vs.Status.SecretName = secretName
-	return nil
+	return true, nil
 }
