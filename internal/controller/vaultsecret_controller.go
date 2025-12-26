@@ -19,15 +19,11 @@ package controller
 import (
 	"context"
 	"fmt"
-	"strings"
 	"time"
 
-	vaultapi "github.com/hashicorp/vault/api"
-	authenticationv1 "k8s.io/api/authentication/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/client-go/kubernetes"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
@@ -50,59 +46,6 @@ type VaultSecretReconciler struct {
 // +kubebuilder:rbac:groups=apps,resources=daemonsets,verbs=list;watch;update;patch
 // +kubebuilder:rbac:groups=core,resources=secrets,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=core,resources=serviceaccounts/token,verbs=get;create
-
-// setupVaultClient sets up the Vault client and authenticates.
-func (r *VaultSecretReconciler) setupVaultClient(ctx context.Context, vaultSecret *cfyczv1.VaultSecret) (*vaultapi.Client, string, error) {
-	clientset := kubernetes.NewForConfigOrDie(ctrl.GetConfigOrDie())
-	impersonateJwt, err := getImpersonateSAToken(ctx, clientset, vaultSecret.GetNamespace(), "default", "serviceaccount", int64(600))
-	if err != nil {
-		return nil, "", err
-	}
-	vaultlib.LogAudit(impersonateJwt, "Obtained impersonated service account token", map[string]interface{}{"namespace": vaultSecret.GetNamespace(), "serviceAccount": "default"})
-
-	vaultClient, err := vaultlib.NewVaultClient()
-	if err != nil {
-		return nil, "", err
-	}
-
-	err = vaultlib.VaultLoginWithK8sAuth(ctx, vaultClient, "k8s-kind", impersonateJwt, vaultSecret.GetNamespace())
-	if err != nil {
-		return nil, "", err
-	}
-	return vaultClient, impersonateJwt, nil
-}
-
-// fetchSecretData fetches secret data from Vault based on annotations and spec.
-func (r *VaultSecretReconciler) fetchSecretData(vaultClient *vaultapi.Client, impersonateJwt string, annotations *cfyczv1.VaultSecretAnnotations, vaultSecret *cfyczv1.VaultSecret) (map[string][]byte, error) {
-	var secretData map[string][]byte
-	if annotations.VaultPath != "" {
-		data, err := vaultlib.FetchSecretEngineKV(vaultClient, impersonateJwt, annotations.VaultMount, annotations.VaultPath)
-		if err != nil {
-			return nil, err
-		}
-		secretData = data
-	} else {
-		secretData = make(map[string][]byte)
-		for secretKey, vaultSpec := range vaultSecret.Spec.StringData {
-			parts := strings.Split(vaultSpec, "@")
-			if len(parts) != 2 {
-				return nil, fmt.Errorf("invalid stringData format for key %s: expected <vaultPath>@<key>", secretKey)
-			}
-			vaultPath := parts[0]
-			keyInVault := parts[1]
-			data, err := vaultlib.FetchSecretEngineKV(vaultClient, impersonateJwt, annotations.VaultMount, vaultPath)
-			if err != nil {
-				return nil, err
-			}
-			value, ok := data[keyInVault]
-			if !ok {
-				return nil, fmt.Errorf("key %s not found in vault path %s", keyInVault, vaultPath)
-			}
-			secretData[secretKey] = value
-		}
-	}
-	return secretData, nil
-}
 
 // handleSecretAndStatus creates or updates the K8s secret and updates the VaultSecret status.
 func (r *VaultSecretReconciler) handleSecretAndStatus(ctx context.Context, vaultSecret *cfyczv1.VaultSecret, secretData map[string][]byte) (bool, error) {
@@ -172,7 +115,7 @@ func (r *VaultSecretReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 	}
 
 	// Setup Vault client
-	vaultClient, impersonateJwt, err := r.setupVaultClient(ctx, &vaultSecret)
+	vaultClient, impersonateJwt, err := vaultlib.SetupVaultClient(ctx, &vaultSecret)
 	if err != nil {
 		vaultSecret.Status.Message = "Failed to setup Vault client: " + err.Error()
 		if updateErr := r.Status().Update(ctx, &vaultSecret); updateErr != nil {
@@ -183,7 +126,7 @@ func (r *VaultSecretReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 	}
 
 	// Fetch secret data
-	secretData, err := r.fetchSecretData(vaultClient, impersonateJwt, &annotations, &vaultSecret)
+	secretData, err := vaultlib.FetchSecretData(vaultClient, impersonateJwt, &annotations, &vaultSecret)
 	if err != nil {
 		vaultSecret.Status.Message = "Failed to fetch secret data: " + err.Error()
 		if updateErr := r.Status().Update(ctx, &vaultSecret); updateErr != nil {
@@ -242,29 +185,4 @@ func (r *VaultSecretReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		For(&cfyczv1.VaultSecret{}).
 		Named("vaultsecret").
 		Complete(r)
-}
-
-// getImpersonateSAToken requests a service account token.
-// Parameters:
-// - ctx: context for the request
-// - clientset: the Kubernetes clientset
-// - namespace: the namespace
-// - serviceaccount: the service account name
-// - audience: the audience for the token
-// - ttl: time to live in seconds
-// Returns: the JWT token string or error
-func getImpersonateSAToken(ctx context.Context, clientset *kubernetes.Clientset, namespace, serviceAccount, audience string, ttl int64) (string, error) {
-	tokenRequest := &authenticationv1.TokenRequest{
-		Spec: authenticationv1.TokenRequestSpec{
-			Audiences:         []string{audience},
-			ExpirationSeconds: &ttl,
-		},
-	}
-
-	result, err := clientset.CoreV1().ServiceAccounts(namespace).CreateToken(ctx, serviceAccount, tokenRequest, metav1.CreateOptions{})
-	if err != nil {
-		return "", err
-	}
-
-	return result.Status.Token, nil
 }
