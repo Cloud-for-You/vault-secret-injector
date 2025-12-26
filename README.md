@@ -83,7 +83,6 @@ vault write auth/${CLUSTER_NAME}/role/vault-secret-injector \
   alias_name_source=serviceaccount_uid
 ```
 
-
 ### Reconciliation Custom CRD
 Operator implementuje reconciliation smyčku pro VaultSecret CRD, která zajišťuje kontinuální synchronizaci tajných údajů z Vault do Kubernetes Secrets.
 
@@ -134,6 +133,37 @@ spec:
 - `vault.hashicorp.com/mount`: Určuje mount point ve Vault (výchozí: `kv-{namespace}`)
 - `vault.hashicorp.com/refresh-interval`: Interval pro automatické obnovení dat (výchozí: 5 minut)
 - `vault.hashicorp.com/secret-name`: Název vytvořeného Kubernetes Secret (výchozí: název VaultSecret)
+
+### Automatický rollout aplikací
+Operator podporuje automatické spouštění rollout (restartu) aplikací při aktualizaci tajných údajů. To zajišťuje, že aplikace okamžitě použijí nové hodnoty bez manuálního zásahu.
+
+#### Konfigurace rollout objektů
+V `spec.rolloutObjectsRef` můžete specifikovat seznam Kubernetes objektů, které se mají restartovat při změně dat:
+
+```yaml
+apiVersion: cfy.cz/v1
+kind: VaultSecret
+metadata:
+  name: my-secret
+spec:
+  stringData:
+    PASSWORD: "myapp/config@password"
+  rolloutObjectsRef:
+  - apiVersion: apps/v1
+    kind: Deployment
+    name: my-deployment
+  - apiVersion: apps/v1
+    kind: StatefulSet
+    name: my-statefulset
+  type: Opaque
+```
+
+**Podporované typy objektů:**
+- `Deployment`
+- `StatefulSet`
+- `DaemonSet`
+
+Rollout se spustí pouze pokud se data v Secret skutečně změnila. Operator aktualizuje anotace v `spec.template.metadata.annotations` s časovým razítkem, což vyvolá rolling update.
 
 ## Getting Started
 

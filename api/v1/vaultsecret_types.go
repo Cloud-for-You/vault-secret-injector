@@ -18,9 +18,11 @@ package v1
 
 import (
 	"context"
+	"fmt"
 	"reflect"
 	"time"
 
+	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -53,7 +55,7 @@ type VaultSecretSpec struct {
 	Type string `json:"type,omitempty"`
 	// list of other CRD object for rollout/restart purposes
 	// +kubebuilder:validation:Optional
-	RestartObjectsRef []RestartOjectRef `json:"restartObjectsRef,omitempty"`
+	RolloutObjectRef []RolloutObjectRef `json:"rolloutObjectsRef,omitempty"`
 }
 
 // VaultSecretStatus defines the observed state of VaultSecret.
@@ -94,12 +96,50 @@ func init() {
 	SchemeBuilder.Register(&VaultSecret{}, &VaultSecretList{})
 }
 
-type RestartOjectRef struct {
+type RolloutObjectRef struct {
 	// +kubebuilder:validation:Enum=apps/v1
 	APIVersion string `json:"apiVersion"`
 	// +kubebuilder:validation:Enum=Deployment;StatefulSet;DaemonSet
 	Kind string `json:"kind"`
 	Name string `json:"name"`
+}
+
+func (r *RolloutObjectRef) TriggerRollout(ctx context.Context, c client.Client, namespace string) error {
+	key := client.ObjectKey{Name: r.Name, Namespace: namespace}
+	switch r.Kind {
+	case "Deployment":
+		dep := &appsv1.Deployment{}
+		if err := c.Get(ctx, key, dep); err != nil {
+			return err
+		}
+		if dep.Spec.Template.Annotations == nil {
+			dep.Spec.Template.Annotations = make(map[string]string)
+		}
+		dep.Spec.Template.Annotations["vault-secret-injector/restartedAt"] = metav1.Now().Format(time.RFC3339)
+		return c.Update(ctx, dep)
+	case "StatefulSet":
+		sts := &appsv1.StatefulSet{}
+		if err := c.Get(ctx, key, sts); err != nil {
+			return err
+		}
+		if sts.Spec.Template.Annotations == nil {
+			sts.Spec.Template.Annotations = make(map[string]string)
+		}
+		sts.Spec.Template.Annotations["vault-secret-injector/restartedAt"] = metav1.Now().Format(time.RFC3339)
+		return c.Update(ctx, sts)
+	case "DaemonSet":
+		ds := &appsv1.DaemonSet{}
+		if err := c.Get(ctx, key, ds); err != nil {
+			return err
+		}
+		if ds.Spec.Template.Annotations == nil {
+			ds.Spec.Template.Annotations = make(map[string]string)
+		}
+		ds.Spec.Template.Annotations["vault-secret-injector/restartedAt"] = metav1.Now().Format(time.RFC3339)
+		return c.Update(ctx, ds)
+	default:
+		return fmt.Errorf("unsupported kind: %s", r.Kind)
+	}
 }
 
 const (

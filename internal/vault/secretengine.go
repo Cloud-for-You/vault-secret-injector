@@ -2,7 +2,9 @@ package vault
 
 import (
 	"fmt"
+	"strings"
 
+	cfyczv1 "github.com/cloud-for-you/vault-secret-injector/api/v1"
 	vaultapi "github.com/hashicorp/vault/api"
 	k8siov1 "k8s.io/api/core/v1"
 )
@@ -113,4 +115,36 @@ func FetchSecretValue(client *vaultapi.Client, jwt, mount, path string) ([]byte,
 		return v, nil
 	}
 	return nil, nil // shouldn't reach
+}
+
+// FetchSecretData fetches secret data from Vault based on annotations and spec.
+func FetchSecretData(vaultClient *vaultapi.Client, impersonateJwt string, annotations *cfyczv1.VaultSecretAnnotations, vaultSecret *cfyczv1.VaultSecret) (map[string][]byte, error) {
+	var secretData map[string][]byte
+	if annotations.VaultPath != "" {
+		data, err := FetchSecretEngineKV(vaultClient, impersonateJwt, annotations.VaultMount, annotations.VaultPath)
+		if err != nil {
+			return nil, err
+		}
+		secretData = data
+	} else {
+		secretData = make(map[string][]byte)
+		for secretKey, vaultSpec := range vaultSecret.Spec.StringData {
+			parts := strings.Split(vaultSpec, "@")
+			if len(parts) != 2 {
+				return nil, fmt.Errorf("invalid stringData format for key %s: expected <vaultPath>@<key>", secretKey)
+			}
+			vaultPath := parts[0]
+			keyInVault := parts[1]
+			data, err := FetchSecretEngineKV(vaultClient, impersonateJwt, annotations.VaultMount, vaultPath)
+			if err != nil {
+				return nil, err
+			}
+			value, ok := data[keyInVault]
+			if !ok {
+				return nil, fmt.Errorf("key %s not found in vault path %s", keyInVault, vaultPath)
+			}
+			secretData[secretKey] = value
+		}
+	}
+	return secretData, nil
 }
