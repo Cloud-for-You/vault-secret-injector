@@ -23,6 +23,7 @@ import (
 	"time"
 
 	authenticationv1 "k8s.io/api/authentication/v1"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes"
@@ -43,6 +44,9 @@ type VaultSecretReconciler struct {
 // +kubebuilder:rbac:groups=cfy.cz,resources=vaultsecrets,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=cfy.cz,resources=vaultsecrets/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=cfy.cz,resources=vaultsecrets/finalizers,verbs=update
+// +kubebuilder:rbac:groups=apps,resources=deployments,verbs=list;watch;update;patch
+// +kubebuilder:rbac:groups=apps,resources=statefulsets,verbs=list;watch;update;patch
+// +kubebuilder:rbac:groups=apps,resources=daemonsets,verbs=list;watch;update;patch
 // +kubebuilder:rbac:groups=core,resources=secrets,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=core,resources=serviceaccounts/token,verbs=get;create
 
@@ -166,6 +170,17 @@ func (r *VaultSecretReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 		}
 	}
 
+	// Check if Kubernetes Secret already exists
+	secretExists := true
+	k8sSecretCheck := &corev1.Secret{}
+	err = r.Client.Get(ctx, client.ObjectKey{Name: annotations.VaultSecretName, Namespace: vaultSecret.Namespace}, k8sSecretCheck)
+  if err != nil {
+    if client.IgnoreNotFound(err) != nil {  // Ignore NotFound, but return other errors
+        return ctrl.Result{}, err
+    }
+    secretExists = false  // Secret does not exist, so this will be a create operation
+	}
+
 	// Create or Update Kubernetes Secret and update VaultSecret Status
 	changed, err := vaultSecret.CreateOrUpdateK8sSecret(ctx, r.Client, secretData)
 	if err != nil {
@@ -176,7 +191,6 @@ func (r *VaultSecretReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 		}
 		return ctrl.Result{}, err
 	}
-	log.Info("Successfully created or updated Kubernetes Secret")
 
 	// Update LastUpdated timestamp only if data changed
 	if changed {
@@ -186,6 +200,25 @@ func (r *VaultSecretReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 		log.Error(updateErr, "Failed to update VaultSecret status")
 		return ctrl.Result{}, updateErr
 	}
+
+	// Trigger rollout specific object if secret data changed
+	if changed && secretExists {
+	  for _, rolloutRef := range vaultSecret.Spec.RolloutObjectRef {
+	  	err := rolloutRef.TriggerRollout(ctx, r.Client, vaultSecret.GetNamespace())
+	  	if err != nil {
+	  		log.Error(err, "Failed to trigger rollout for object", "apiVersion", rolloutRef.APIVersion, "kind", rolloutRef.Kind, "name", rolloutRef.Name)
+	  		vaultSecret.Status.Message = "Failed to trigger rollout for object: " + err.Error()
+	  		if updateErr := r.Status().Update(ctx, &vaultSecret); updateErr != nil {
+	  			log.Error(updateErr, "Failed to update VaultSecret status")
+	  			return ctrl.Result{}, updateErr
+	  		}
+	  		return ctrl.Result{}, err
+	  	}
+	  	log.Info("Triggered rollout for object", "apiVersion", rolloutRef.APIVersion, "kind", rolloutRef.Kind, "name", rolloutRef.Name)
+	  }
+	}
+
+	log.Info("Successfully reconciled VaultSecret", "name", vaultSecret.Name, "namespace", vaultSecret.Namespace)
 
 	if annotations.VaultRefreshInterval > 0 {
 		// Requeue after the specified refresh interval
