@@ -19,10 +19,8 @@ package controller
 import (
 	"context"
 	"fmt"
-	"time"
 
 	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -46,23 +44,6 @@ type VaultSecretReconciler struct {
 // +kubebuilder:rbac:groups=apps,resources=daemonsets,verbs=list;watch;update;patch
 // +kubebuilder:rbac:groups=core,resources=secrets,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=core,resources=serviceaccounts/token,verbs=get;create
-
-// handleSecretAndStatus creates or updates the K8s secret and updates the VaultSecret status.
-func (r *VaultSecretReconciler) handleSecretAndStatus(ctx context.Context, vaultSecret *cfyczv1.VaultSecret, secretData map[string][]byte) (bool, error) {
-	changed, err := vaultSecret.CreateOrUpdateK8sSecret(ctx, r.Client, secretData)
-	if err != nil {
-		return false, err
-	}
-
-	// Update LastUpdated timestamp only if data changed
-	if changed {
-		vaultSecret.Status.LastUpdated = metav1.Now().Format(time.RFC3339)
-	}
-	if updateErr := r.Status().Update(ctx, vaultSecret); updateErr != nil {
-		return false, updateErr
-	}
-	return changed, nil
-}
 
 // triggerRollouts triggers rollouts for the specified objects if secret changed and secret existed.
 func (r *VaultSecretReconciler) triggerRollouts(ctx context.Context, vaultSecret *cfyczv1.VaultSecret, changed bool, secretExists bool) error {
@@ -148,7 +129,7 @@ func (r *VaultSecretReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 	}
 
 	// Handle secret creation/update and status
-	changed, err := r.handleSecretAndStatus(ctx, &vaultSecret, secretData)
+	changed, err := vaultSecret.HandleSecretAndStatus(ctx, r.Client, r.Status(), secretData)
 	if err != nil {
 		vaultSecret.Status.Message = "Failed to handle secret and status: " + err.Error()
 		if updateErr := r.Status().Update(ctx, &vaultSecret); updateErr != nil {
