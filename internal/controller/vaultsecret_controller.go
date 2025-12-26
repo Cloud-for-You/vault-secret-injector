@@ -22,6 +22,7 @@ import (
 	"strings"
 	"time"
 
+	vaultapi "github.com/hashicorp/vault/api"
 	authenticationv1 "k8s.io/api/authentication/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -49,6 +50,91 @@ type VaultSecretReconciler struct {
 // +kubebuilder:rbac:groups=apps,resources=daemonsets,verbs=list;watch;update;patch
 // +kubebuilder:rbac:groups=core,resources=secrets,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=core,resources=serviceaccounts/token,verbs=get;create
+
+// setupVaultClient sets up the Vault client and authenticates.
+func (r *VaultSecretReconciler) setupVaultClient(ctx context.Context, vaultSecret *cfyczv1.VaultSecret) (*vaultapi.Client, string, error) {
+	clientset := kubernetes.NewForConfigOrDie(ctrl.GetConfigOrDie())
+	impersonateJwt, err := getImpersonateSAToken(ctx, clientset, vaultSecret.GetNamespace(), "default", "serviceaccount", int64(600))
+	if err != nil {
+		return nil, "", err
+	}
+	vaultlib.LogAudit(impersonateJwt, "Obtained impersonated service account token", map[string]interface{}{"namespace": vaultSecret.GetNamespace(), "serviceAccount": "default"})
+
+	vaultClient, err := vaultlib.NewVaultClient()
+	if err != nil {
+		return nil, "", err
+	}
+
+	err = vaultlib.VaultLoginWithK8sAuth(ctx, vaultClient, "k8s-kind", impersonateJwt, vaultSecret.GetNamespace())
+	if err != nil {
+		return nil, "", err
+	}
+	return vaultClient, impersonateJwt, nil
+}
+
+// fetchSecretData fetches secret data from Vault based on annotations and spec.
+func (r *VaultSecretReconciler) fetchSecretData(vaultClient *vaultapi.Client, impersonateJwt string, annotations *cfyczv1.VaultSecretAnnotations, vaultSecret *cfyczv1.VaultSecret) (map[string][]byte, error) {
+	var secretData map[string][]byte
+	if annotations.VaultPath != "" {
+		data, err := vaultlib.FetchSecretEngineKV(vaultClient, impersonateJwt, annotations.VaultMount, annotations.VaultPath)
+		if err != nil {
+			return nil, err
+		}
+		secretData = data
+	} else {
+		secretData = make(map[string][]byte)
+		for secretKey, vaultSpec := range vaultSecret.Spec.StringData {
+			parts := strings.Split(vaultSpec, "@")
+			if len(parts) != 2 {
+				return nil, fmt.Errorf("invalid stringData format for key %s: expected <vaultPath>@<key>", secretKey)
+			}
+			vaultPath := parts[0]
+			keyInVault := parts[1]
+			data, err := vaultlib.FetchSecretEngineKV(vaultClient, impersonateJwt, annotations.VaultMount, vaultPath)
+			if err != nil {
+				return nil, err
+			}
+			value, ok := data[keyInVault]
+			if !ok {
+				return nil, fmt.Errorf("key %s not found in vault path %s", keyInVault, vaultPath)
+			}
+			secretData[secretKey] = value
+		}
+	}
+	return secretData, nil
+}
+
+// handleSecretAndStatus creates or updates the K8s secret and updates the VaultSecret status.
+func (r *VaultSecretReconciler) handleSecretAndStatus(ctx context.Context, vaultSecret *cfyczv1.VaultSecret, secretData map[string][]byte) (bool, error) {
+	changed, err := vaultSecret.CreateOrUpdateK8sSecret(ctx, r.Client, secretData)
+	if err != nil {
+		return false, err
+	}
+
+	// Update LastUpdated timestamp only if data changed
+	if changed {
+		vaultSecret.Status.LastUpdated = metav1.Now().Format(time.RFC3339)
+	}
+	if updateErr := r.Status().Update(ctx, vaultSecret); updateErr != nil {
+		return false, updateErr
+	}
+	return changed, nil
+}
+
+// triggerRollouts triggers rollouts for the specified objects if secret changed and secret existed.
+func (r *VaultSecretReconciler) triggerRollouts(ctx context.Context, vaultSecret *cfyczv1.VaultSecret, changed bool, secretExists bool) error {
+	if !changed || !secretExists {
+		return nil
+	}
+	for _, rolloutRef := range vaultSecret.Spec.RolloutObjectRef {
+		err := rolloutRef.TriggerRollout(ctx, r.Client, vaultSecret.GetNamespace())
+		if err != nil {
+			return err
+		}
+		logf.FromContext(ctx).Info("Triggered rollout for object", "apiVersion", rolloutRef.APIVersion, "kind", rolloutRef.Kind, "name", rolloutRef.Name)
+	}
+	return nil
+}
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
@@ -85,23 +171,10 @@ func (r *VaultSecretReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 		return ctrl.Result{}, err
 	}
 
-	// Get Impersonate Service Account Token
-	clientset := kubernetes.NewForConfigOrDie(ctrl.GetConfigOrDie())
-	impersonateJwt, err := getImpersonateSAToken(ctx, clientset, vaultSecret.GetNamespace(), "default", "serviceaccount", int64(600))
+	// Setup Vault client
+	vaultClient, impersonateJwt, err := r.setupVaultClient(ctx, &vaultSecret)
 	if err != nil {
-		vaultSecret.Status.Message = "Failed to get impersonated service account token: " + err.Error()
-		if updateErr := r.Status().Update(ctx, &vaultSecret); updateErr != nil {
-			log.Error(updateErr, "Failed to update VaultSecret status")
-			return ctrl.Result{}, updateErr
-		}
-		return ctrl.Result{}, err
-	}
-	vaultlib.LogAudit(impersonateJwt, "Obtained impersonated service account token", map[string]interface{}{"namespace": vaultSecret.GetNamespace(), "serviceAccount": "default"})
-
-	// Create Vault Client
-	vaultClient, err := vaultlib.NewVaultClient()
-	if err != nil {
-		vaultSecret.Status.Message = "Failed to create Vault client: " + err.Error()
+		vaultSecret.Status.Message = "Failed to setup Vault client: " + err.Error()
 		if updateErr := r.Status().Update(ctx, &vaultSecret); updateErr != nil {
 			log.Error(updateErr, "Failed to update VaultSecret status")
 			return ctrl.Result{}, updateErr
@@ -109,82 +182,32 @@ func (r *VaultSecretReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 		return ctrl.Result{}, err
 	}
 
-	// Login to Vault with K8s Auth Method
-	err = vaultlib.VaultLoginWithK8sAuth(ctx, vaultClient, "k8s-kind", impersonateJwt, vaultSecret.GetNamespace())
+	// Fetch secret data
+	secretData, err := r.fetchSecretData(vaultClient, impersonateJwt, &annotations, &vaultSecret)
 	if err != nil {
-		vaultSecret.Status.Message = "Failed to login to Vault: " + err.Error()
+		vaultSecret.Status.Message = "Failed to fetch secret data: " + err.Error()
 		if updateErr := r.Status().Update(ctx, &vaultSecret); updateErr != nil {
 			log.Error(updateErr, "Failed to update VaultSecret status")
 			return ctrl.Result{}, updateErr
 		}
 		return ctrl.Result{}, err
-	}
-
-	// Fetch data from Vault KV engine
-	var secretData map[string][]byte
-	if annotations.VaultPath != "" {
-		secretData, err = vaultlib.FetchSecretEngineKV(vaultClient, impersonateJwt, annotations.VaultMount, annotations.VaultPath)
-		if err != nil {
-			vaultSecret.Status.Message = "Failed to fetch secret from Vault: " + err.Error()
-			if updateErr := r.Status().Update(ctx, &vaultSecret); updateErr != nil {
-				log.Error(updateErr, "Failed to update VaultSecret status")
-				return ctrl.Result{}, updateErr
-			}
-			return ctrl.Result{}, err
-		}
-	} else {
-		secretData = make(map[string][]byte)
-		for secretKey, vaultSpec := range vaultSecret.Spec.StringData {
-			parts := strings.Split(vaultSpec, "@")
-			if len(parts) != 2 {
-				err := fmt.Errorf("invalid stringData format for key %s: expected <vaultPath>@<key>", secretKey)
-				vaultSecret.Status.Message = "Invalid stringData format: " + err.Error()
-				if updateErr := r.Status().Update(ctx, &vaultSecret); updateErr != nil {
-					log.Error(updateErr, "Failed to update VaultSecret status")
-					return ctrl.Result{}, updateErr
-				}
-				return ctrl.Result{}, err
-			}
-			vaultPath := parts[0]
-			keyInVault := parts[1]
-			data, err := vaultlib.FetchSecretEngineKV(vaultClient, impersonateJwt, annotations.VaultMount, vaultPath)
-			if err != nil {
-				vaultSecret.Status.Message = "Failed to fetch secret from Vault: " + err.Error()
-				if updateErr := r.Status().Update(ctx, &vaultSecret); updateErr != nil {
-					log.Error(updateErr, "Failed to update VaultSecret status")
-					return ctrl.Result{}, updateErr
-				}
-				return ctrl.Result{}, err
-			}
-			value, ok := data[keyInVault]
-			if !ok {
-				err := fmt.Errorf("key %s not found in vault path %s", keyInVault, vaultPath)
-				vaultSecret.Status.Message = "Key not found in Vault: " + err.Error()
-				if updateErr := r.Status().Update(ctx, &vaultSecret); updateErr != nil {
-					log.Error(updateErr, "Failed to update VaultSecret status")
-					return ctrl.Result{}, updateErr
-				}
-				return ctrl.Result{}, err
-			}
-			secretData[secretKey] = value
-		}
 	}
 
 	// Check if Kubernetes Secret already exists
 	secretExists := true
 	k8sSecretCheck := &corev1.Secret{}
-	err = r.Client.Get(ctx, client.ObjectKey{Name: annotations.VaultSecretName, Namespace: vaultSecret.Namespace}, k8sSecretCheck)
-  if err != nil {
-    if client.IgnoreNotFound(err) != nil {  // Ignore NotFound, but return other errors
-        return ctrl.Result{}, err
-    }
-    secretExists = false  // Secret does not exist, so this will be a create operation
+	err = r.Get(ctx, client.ObjectKey{Name: annotations.VaultSecretName, Namespace: vaultSecret.Namespace}, k8sSecretCheck)
+	if err != nil {
+		if client.IgnoreNotFound(err) != nil { // Ignore NotFound, but return other errors
+			return ctrl.Result{}, err
+		}
+		secretExists = false // Secret does not exist, so this will be a create operation
 	}
 
-	// Create or Update Kubernetes Secret and update VaultSecret Status
-	changed, err := vaultSecret.CreateOrUpdateK8sSecret(ctx, r.Client, secretData)
+	// Handle secret creation/update and status
+	changed, err := r.handleSecretAndStatus(ctx, &vaultSecret, secretData)
 	if err != nil {
-		vaultSecret.Status.Message = "Failed to create or update Kubernetes Secret: " + err.Error()
+		vaultSecret.Status.Message = "Failed to handle secret and status: " + err.Error()
 		if updateErr := r.Status().Update(ctx, &vaultSecret); updateErr != nil {
 			log.Error(updateErr, "Failed to update VaultSecret status")
 			return ctrl.Result{}, updateErr
@@ -192,30 +215,16 @@ func (r *VaultSecretReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 		return ctrl.Result{}, err
 	}
 
-	// Update LastUpdated timestamp only if data changed
-	if changed {
-		vaultSecret.Status.LastUpdated = metav1.Now().Format(time.RFC3339)
-	}
-	if updateErr := r.Status().Update(ctx, &vaultSecret); updateErr != nil {
-		log.Error(updateErr, "Failed to update VaultSecret status")
-		return ctrl.Result{}, updateErr
-	}
-
-	// Trigger rollout specific object if secret data changed
-	if changed && secretExists {
-	  for _, rolloutRef := range vaultSecret.Spec.RolloutObjectRef {
-	  	err := rolloutRef.TriggerRollout(ctx, r.Client, vaultSecret.GetNamespace())
-	  	if err != nil {
-	  		log.Error(err, "Failed to trigger rollout for object", "apiVersion", rolloutRef.APIVersion, "kind", rolloutRef.Kind, "name", rolloutRef.Name)
-	  		vaultSecret.Status.Message = "Failed to trigger rollout for object: " + err.Error()
-	  		if updateErr := r.Status().Update(ctx, &vaultSecret); updateErr != nil {
-	  			log.Error(updateErr, "Failed to update VaultSecret status")
-	  			return ctrl.Result{}, updateErr
-	  		}
-	  		return ctrl.Result{}, err
-	  	}
-	  	log.Info("Triggered rollout for object", "apiVersion", rolloutRef.APIVersion, "kind", rolloutRef.Kind, "name", rolloutRef.Name)
-	  }
+	// Trigger rollouts
+	err = r.triggerRollouts(ctx, &vaultSecret, changed, secretExists)
+	if err != nil {
+		log.Error(err, "Failed to trigger rollouts")
+		vaultSecret.Status.Message = "Failed to trigger rollouts: " + err.Error()
+		if updateErr := r.Status().Update(ctx, &vaultSecret); updateErr != nil {
+			log.Error(updateErr, "Failed to update VaultSecret status")
+			return ctrl.Result{}, updateErr
+		}
+		return ctrl.Result{}, err
 	}
 
 	log.Info("Successfully reconciled VaultSecret", "name", vaultSecret.Name, "namespace", vaultSecret.Namespace)
