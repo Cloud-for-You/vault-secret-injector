@@ -73,10 +73,6 @@ func (v *NamespaceCustomValidator) ValidateCreate(ctx context.Context, obj runti
 		return nil, err
 	}
 	role := os.Getenv("VAULT_ROLE")
-	mount := os.Getenv("VAULT_K8S_AUTH_MOUNT")
-	if mount == "" {
-		mount = "kubernetes"
-	}
 
 	vaultClient, err := vaultlib.NewVaultClient()
 	if err != nil {
@@ -84,7 +80,7 @@ func (v *NamespaceCustomValidator) ValidateCreate(ctx context.Context, obj runti
 		return nil, err
 	}
 
-	err = vaultlib.VaultLoginWithK8sAuth(ctx, vaultClient, mount, string(jwt), role)
+	err = vaultlib.VaultLoginWithK8sAuth(ctx, vaultClient, os.Getenv("VAULT_K8S_AUTH_MOUNT"), string(jwt), role)
 	if err != nil {
 		namespacelog.Error(err, "Failed to login to Vault")
 		return nil, err
@@ -96,7 +92,7 @@ func (v *NamespaceCustomValidator) ValidateCreate(ctx context.Context, obj runti
 		return nil, err
 	}
 
-	err = vaultlib.CreateVaultKubernetesAuthRole(namespace, vaultClient, mount, string(jwt))
+	err = vaultlib.CreateVaultKubernetesAuthRole(namespace, vaultClient, os.Getenv("VAULT_K8S_AUTH_MOUNT"), string(jwt))
 	if err != nil {
 		namespacelog.Error(err, "Failed to create Vault Kubernetes auth role")
 		return nil, err
@@ -138,10 +134,6 @@ func (v *NamespaceCustomValidator) ValidateDelete(ctx context.Context, obj runti
 		return nil, err
 	}
 	role := os.Getenv("VAULT_ROLE")
-	mount := os.Getenv("VAULT_K8S_AUTH_MOUNT")
-	if mount == "" {
-		mount = "kubernetes"
-	}
 
 	vaultClient, err := vaultlib.NewVaultClient()
 	if err != nil {
@@ -149,13 +141,13 @@ func (v *NamespaceCustomValidator) ValidateDelete(ctx context.Context, obj runti
 		return nil, err
 	}
 
-	err = vaultlib.VaultLoginWithK8sAuth(ctx, vaultClient, mount, string(jwt), role)
+	err = vaultlib.VaultLoginWithK8sAuth(ctx, vaultClient, os.Getenv("VAULT_K8S_AUTH_MOUNT"), string(jwt), role)
 	if err != nil {
 		namespacelog.Error(err, "Failed to login to Vault")
 		return nil, err
 	}
 
-	err = vaultlib.DeleteVaultKubernetesAuthRole(namespace, vaultClient, mount, string(jwt))
+	err = vaultlib.DeleteVaultKubernetesAuthRole(namespace, vaultClient, os.Getenv("VAULT_K8S_AUTH_MOUNT"), string(jwt))
 	if err != nil {
 		namespacelog.Error(err, "Failed to delete Vault Kubernetes auth role")
 		return nil, err

@@ -2,6 +2,7 @@ package vault
 
 import (
 	"context"
+	"os"
 
 	cfyczv1 "github.com/cloud-for-you/vault-secret-injector/api/v1"
 	vaultapi "github.com/hashicorp/vault/api"
@@ -50,7 +51,7 @@ func SetupVaultClient(ctx context.Context, vaultSecret *cfyczv1.VaultSecret) (*v
 		return nil, "", err
 	}
 
-	err = VaultLoginWithK8sAuth(ctx, vaultClient, "k8s-kind", impersonateJwt, vaultSecret.GetNamespace())
+	err = VaultLoginWithK8sAuth(ctx, vaultClient, os.Getenv("VAULT_K8S_AUTH_MOUNT"), impersonateJwt, vaultSecret.GetNamespace())
 	if err != nil {
 		return nil, "", err
 	}
