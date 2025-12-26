@@ -2,6 +2,7 @@ package vault
 
 import (
 	"context"
+	"fmt"
 	"os"
 
 	cfyczv1 "github.com/cloud-for-you/vault-secret-injector/api/v1"
@@ -35,6 +36,21 @@ func getImpersonateSAToken(ctx context.Context, clientset *kubernetes.Clientset,
 	}
 
 	return result.Status.Token, nil
+}
+
+// NewVaultClient creates a new Vault API client with configuration from environment variables.
+// Uses VAULT_ADDR and VAULT_TLS_SKIP_VERIFY environment variables.
+// Returns: the configured Vault client or error
+func NewVaultClient() (*vaultapi.Client, error) {
+	cfg := vaultapi.DefaultConfig()
+	cfg.Address = os.Getenv("VAULT_ADDR")
+	if os.Getenv("VAULT_TLS_SKIP_VERIFY") == "true" {
+		if err := cfg.ConfigureTLS(&vaultapi.TLSConfig{Insecure: true}); err != nil {
+			return nil, fmt.Errorf("configure vault TLS: %w", err)
+		}
+	}
+
+	return vaultapi.NewClient(cfg)
 }
 
 // SetupVaultClient sets up the Vault client and authenticates.

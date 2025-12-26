@@ -3,26 +3,10 @@ package vault
 import (
 	"context"
 	"fmt"
-	"os"
 
 	vaultapi "github.com/hashicorp/vault/api"
 	vaultk8s "github.com/hashicorp/vault/api/auth/kubernetes"
 )
-
-// NewVaultClient creates a new Vault API client with configuration from environment variables.
-// Uses VAULT_ADDR and VAULT_TLS_SKIP_VERIFY environment variables.
-// Returns: the configured Vault client or error
-func NewVaultClient() (*vaultapi.Client, error) {
-	cfg := vaultapi.DefaultConfig()
-	cfg.Address = os.Getenv("VAULT_ADDR")
-	if os.Getenv("VAULT_TLS_SKIP_VERIFY") == "true" {
-		if err := cfg.ConfigureTLS(&vaultapi.TLSConfig{Insecure: true}); err != nil {
-			return nil, fmt.Errorf("configure vault TLS: %w", err)
-		}
-	}
-
-	return vaultapi.NewClient(cfg)
-}
 
 // VaultLoginWithK8sAuth performs login to Vault using Kubernetes authentication.
 // Parameters:
