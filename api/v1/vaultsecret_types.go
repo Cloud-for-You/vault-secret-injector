@@ -252,3 +252,19 @@ func (vs *VaultSecret) CreateOrUpdateK8sSecret(ctx context.Context, c client.Cli
 	vs.Status.SecretName = secretName
 	return true, nil
 }
+
+func (vs *VaultSecret) HandleSecretAndStatus(ctx context.Context, c client.Client, statusWriter client.StatusWriter, secretData map[string][]byte) (bool, error) {
+	changed, err := vs.CreateOrUpdateK8sSecret(ctx, c, secretData)
+	if err != nil {
+		return false, err
+	}
+
+	// Update LastUpdated timestamp only if data changed
+	if changed {
+		vs.Status.LastUpdated = metav1.Now().Format(time.RFC3339)
+	}
+	if updateErr := statusWriter.Update(ctx, vs); updateErr != nil {
+		return false, updateErr
+	}
+	return changed, nil
+}
