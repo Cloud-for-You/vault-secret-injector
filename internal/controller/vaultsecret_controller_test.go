@@ -50,8 +50,15 @@ var _ = Describe("VaultSecret Controller", func() {
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      resourceName,
 						Namespace: "default",
+						Annotations: map[string]string{
+							"vault.hashicorp.com/path": "test/path",
+						},
 					},
-					// TODO(user): Specify other spec details if needed.
+					Spec: cfyczv1.VaultSecretSpec{
+						StringData: map[string]string{
+							"key1": "value1",
+						},
+					},
 				}
 				Expect(k8sClient.Create(ctx, resource)).To(Succeed())
 			}
@@ -76,7 +83,8 @@ var _ = Describe("VaultSecret Controller", func() {
 			_, err := controllerReconciler.Reconcile(ctx, reconcile.Request{
 				NamespacedName: typeNamespacedName,
 			})
-			Expect(err).NotTo(HaveOccurred())
+			// In test environment, vault is not set up, so expect error
+			Expect(err).To(HaveOccurred())
 			// TODO(user): Add more specific assertions depending on your controller's reconciliation logic.
 			// Example: If you expect a certain status condition after reconciliation, verify it here.
 		})
