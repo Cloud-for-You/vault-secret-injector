@@ -1,15 +1,16 @@
 # vault-secret-injector
 
-## Description
-Operátor, který poskytuje komplexní řešení pro správu tajných údajů v Kubernetes prostředí pomocí HashiCorp Vault. Projekt nabízí:
+## Popis
+Poskytuje komplexní řešení pro správu tajných údajů v Kubernetes prostředí pomocí HashiCorp Vault. Projekt nabízí:
 
 - **Automatickou synchronizaci tajných údajů**: Operator kontinuálně synchronizuje data z Vault do Kubernetes Secrets na základě definovaných VaultSecret CRD
 - **Bezpečnou správu citlivých dat**: Centralizovaná správa tajných údajů s pokročilými bezpečnostními funkcemi Vault
 - **Izolaci na úrovni Namespace**: Každý Namespace má své vlastní Vault politiky a autentizační role
 - **Validaci a automatizaci**: Integrované validační webhooky zajišťují správnou konfiguraci a automatickou správu Vault zdrojů
+- **Automatický rollout/restart**: Při změně dat v secretu a referenci na existující aplikace inicializuje jejich postupný restart
 
 ### Výhody a použití
-Tento operator je ideální pro organizace, které potřebují:
+Je ideální pro organizace, které potřebují:
 - Centralizovanou správu tajných údajů napříč více aplikacemi a týmy, ale nechtějí implementovat plný Vault Secret Operátor z důvodu složité konfigurace
 - Automatickou rotaci a aktualizaci credentials bez výpadků služeb
 - Dodržování bezpečnostních standardů s auditováním přístupu k tajným údajům
@@ -17,7 +18,7 @@ Tento operator je ideální pro organizace, které potřebují:
 - Izolaci tajných údajů mezi různými prostředími (dev, staging, prod)
 
 ### Validating Webhook
-Operator obsahuje validační webhook pro Namespace zdroje, který automaticky spravuje Vault zdroje při životním cyklu Namespace. Tato funkce přináší uživatelům následující výhody:
+Implementuje webhook pro Namespace zdroje, který automaticky spravuje Vault zdroje při životním cyklu Namespace. Tato funkce přináší uživatelům následující výhody:
 
 - **Automatická izolace tajných údajů**: Každý Namespace získá své vlastní Vault politiky a role bez manuální konfigurace
 - **Zabezpečení podle principu nejmenších privilegií**: Service Accounts v Namespace mohou přistupovat pouze k tajným údajům svého Namespace
@@ -31,7 +32,7 @@ Webhook provádí následující akce při vytváření, aktualizaci nebo mazán
 - **Při aktualizaci Namespace**: V současné době neprovádí žádné akce (vyhrazeno pro budoucí rozšíření).
 - **Při mazání Namespace**: Webhook se autentizuje do Vault, smaže odpovídající Kubernetes autentizační roli a politiku spojenou s Namespace.
 
-### Hashicorp Vault ACL Policy
+### Nutná Hashicorp Vault ACL Policy
 ```
 # list auth methods (for OIDC accessor discovery)
 path "sys/auth"   { capabilities = ["read"] }
@@ -62,22 +63,24 @@ path "sys/internal/ui/mounts"   { capabilities = ["read"] }
 path "sys/internal/ui/mounts/*" { capabilities = ["read"] }
 ```
 
-### Hashicorp Vault Kubernetes role
+### Vytvoření Hashicorp Vault Kubernetes role
 ```shell
 kubectl port-forward -n hscp-vault svc/vault 8200:8200
 
 export VAULT_ADDR="http://localhost:8200"
 export VAULT_TOKEN="hvs. ......."
-export CLUSTER_NAME="k8s-kind"
+export VAULT_K8S_AUTH_MOUNT="k8s-kind"
+export NAMESPACE="vault-secret-injector-system"
+export SERVICEACCOUNT_NAME="vault-secret-injector-controller-manager"
 export K8S_HOST="https://$(kubectl get svc -n default kubernetes -o jsonpath='{.spec.clusterIP}'):443"
 export K8S_JWT=$(kubectl get secret -n vault-secret-injector-system vault-secret-injector-controller-manager-token -o jsonpath="{.data.token}" | base64 -d)
 kubectl get secret -n vault-secret-injector-system vault-secret-injector-controller-manager-token -o jsonpath="{.data.ca\.crt}" | base64 -d > ca.crt
 
-vault auth enable -path=${CLUSTER_NAME} kubernetes
-vault write auth/${CLUSTER_NAME}/config token_reviewer_jwt=$K8S_JWT kubernetes_host=$K8S_HOST kubernetes_ca_cert=@ca.crt
-vault write auth/${CLUSTER_NAME}/role/vault-secret-injector \
-  bound_service_account_names=vault-secret-injector-controller-manager \
-  bound_service_account_namespaces=vault-secret-injector-system \
+vault auth enable -path=${VAULT_K8S_AUTH_MOUNT} kubernetes
+vault write auth/${VAULT_K8S_AUTH_MOUNT}/config token_reviewer_jwt=$K8S_JWT kubernetes_host=$K8S_HOST kubernetes_ca_cert=@ca.crt
+vault write auth/${VAULT_K8S_AUTH_MOUNT}/role/vault-secret-injector \
+  bound_service_account_names=${SERVICEACCOUNT_NAME} \
+  bound_service_account_namespaces=${NAMESPACE} \
   policies=vault-secret-injector \
   audience=https://kubernetes.default.svc.cluster.local \
   alias_name_source=serviceaccount_uid
@@ -87,7 +90,6 @@ vault write auth/${CLUSTER_NAME}/role/vault-secret-injector \
 Operator implementuje reconciliation smyčku pro VaultSecret CRD, která zajišťuje kontinuální synchronizaci tajných údajů z Vault do Kubernetes Secrets.
 
 #### Možnosti přístupu k citlivým datům
-
 Operator podporuje dva způsoby přístupu k tajným údajům z Vault:
 
 1. **Načtení všech klíčů z cesty (path annotation)**:
@@ -129,13 +131,13 @@ spec:
   type: Opaque
 ```
 
-**Další anotace:**
-- `vault.hashicorp.com/mount`: Určuje mount point ve Vault (výchozí: `kv-{namespace}`)
-- `vault.hashicorp.com/refresh-interval`: Interval pro automatické obnovení dat (výchozí: 5 minut)
-- `vault.hashicorp.com/secret-name`: Název vytvořeného Kubernetes Secret (výchozí: název VaultSecret)
+**Další podporované anotace:**
+- `vault.hashicorp.com/mount`: Určuje mount point ve Vault (výchozí: `kv-{namespace_name}`)
+- `vault.hashicorp.com/refresh-interval`: Interval pro automatické obnovení dat (výchozí: `5 minut`)
+- `vault.hashicorp.com/secret-name`: Název vytvořeného Kubernetes Secret (výchozí: `název VaultSecret`)
 
 ### Automatický rollout aplikací
-Operator podporuje automatické spouštění rollout (restartu) aplikací při aktualizaci tajných údajů. To zajišťuje, že aplikace okamžitě použijí nové hodnoty bez manuálního zásahu.
+Automaticky spoustí rollout (restart) aplikací při aktualizaci tajných údajů do objektu Secret. To zajišťuje, že aplikace okamžitě použijí nové hodnoty bez manuálního zásahu.
 
 #### Konfigurace rollout objektů
 V `spec.rolloutObjectsRef` můžete specifikovat seznam Kubernetes objektů, které se mají restartovat při změně dat:
@@ -152,9 +154,6 @@ spec:
   - apiVersion: apps/v1
     kind: Deployment
     name: my-deployment
-  - apiVersion: apps/v1
-    kind: StatefulSet
-    name: my-statefulset
   type: Opaque
 ```
 
