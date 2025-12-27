@@ -62,7 +62,7 @@ var _ = Describe("VaultSecret Controller", func() {
 						Type:      "Opaque",
 						Immutable: false,
 						RolloutObjectRef: []cfyczv1.RolloutObjectRef{
-							cfyczv1.RolloutObjectRef{
+							{
 								APIVersion: "apps/v1",
 								Kind:       "Deployment",
 								Name:       "test-deployment",
