@@ -47,17 +47,21 @@ type VaultSecretSpec struct {
 	// +kubebuilder:validation:Optional
 	// +kubebuilder:default:=false
 	Immutable bool `json:"immutable,omitempty"`
-	// StringData is an example field of VaultSecret. Edit vaultsecret_types.go to remove/update
-	// +kubebuilder:validation:Optional
-	StringData map[string]VaultSecretDataValue `json:"stringData,omitempty"`
-	// stringData allows specifying non-binary secret data in string form. It is
+
+	// StringData is an example field of VaultSecret. Edit vaultsecret_types.go to remove/update.
+	// StringData allows specifying non-binary secret data in string form. It is
 	// provided as a write-only input field for convenience. All keys and values
 	// are merged into the data field on write, overwriting any existing values.
 	// The stringData field is never output when reading from the API.
 	// +kubebuilder:validation:Optional
+	StringData map[string]VaultSecretDataValue `json:"stringData,omitempty"`
+
+	// Type of the secret, e.g. Opaque, kubernetes.io/dockerconfigjson, etc.
+	// +kubebuilder:validation:Optional
 	// +kubebuilder:default:=Opaque
 	Type string `json:"type,omitempty"`
-	// list of other CRD object for rollout/restart purposes
+
+	// List of other CRD object for rollout/restart purposes
 	// +kubebuilder:validation:Optional
 	RolloutObjectRef []RolloutObjectRef `json:"rolloutObjectsRef,omitempty"`
 }
