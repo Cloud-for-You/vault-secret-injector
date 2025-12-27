@@ -118,7 +118,7 @@ func FetchSecretValue(client *vaultapi.Client, jwt, mount, path string) ([]byte,
 }
 
 // FetchSecretData fetches secret data from Vault based on annotations and spec.
-func FetchSecretData(vaultClient *vaultapi.Client, impersonateJwt string, annotations *cfyczv1.VaultSecretAnnotations, vaultSecret *cfyczv1.VaultSecret) (map[string][]byte, error) {
+func FetchSecretData(vaultClient *vaultapi.Client, impersonateJwt string, annotations *cfyczv1.KeyVaultAnnotations, vaultSecret *cfyczv1.KeyVault) (map[string][]byte, error) {
 	var secretData map[string][]byte
 	if annotations.VaultPath != "" {
 		data, err := FetchSecretEngineKV(vaultClient, impersonateJwt, annotations.VaultMount, annotations.VaultPath)

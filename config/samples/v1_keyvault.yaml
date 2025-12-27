@@ -1,5 +1,5 @@
-apiVersion: cfy.cz/v1
-kind: VaultSecret
+apiVersion: vaultsecret.cfy.cz/v1
+kind: KeyVault
 metadata:
   annotations:
     vault.hashicorp.com/refresh-interval: 10s
@@ -7,7 +7,7 @@ metadata:
   labels:
     app.kubernetes.io/name: vault-secret-injector
     app.kubernetes.io/managed-by: kustomize
-  name: vaultsecret-sample
+  name: keyvault-sample
   namespace: test
 spec:
   type: Opaque

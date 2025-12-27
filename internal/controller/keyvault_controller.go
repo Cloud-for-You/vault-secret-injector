@@ -30,15 +30,15 @@ import (
 	vaultlib "github.com/cloud-for-you/vault-secret-injector/internal/vault"
 )
 
-// VaultSecretReconciler reconciles a VaultSecret object
-type VaultSecretReconciler struct {
+// KeyVaultReconciler reconciles a KeyVault object
+type KeyVaultReconciler struct {
 	client.Client
 	Scheme *runtime.Scheme
 }
 
-// +kubebuilder:rbac:groups=cfy.cz,resources=vaultsecrets,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=cfy.cz,resources=vaultsecrets/status,verbs=get;update;patch
-// +kubebuilder:rbac:groups=cfy.cz,resources=vaultsecrets/finalizers,verbs=update
+// +kubebuilder:rbac:groups=vaultsecret.cfy.cz,resources=keyvaults,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=vaultsecret.cfy.cz,resources=keyvaults/status,verbs=get;update;patch
+// +kubebuilder:rbac:groups=vaultsecret.cfy.cz,resources=keyvaults/finalizers,verbs=update
 // +kubebuilder:rbac:groups=apps,resources=deployments,verbs=list;watch;update;patch
 // +kubebuilder:rbac:groups=apps,resources=statefulsets,verbs=list;watch;update;patch
 // +kubebuilder:rbac:groups=apps,resources=daemonsets,verbs=list;watch;update;patch
@@ -46,7 +46,7 @@ type VaultSecretReconciler struct {
 // +kubebuilder:rbac:groups=core,resources=serviceaccounts/token,verbs=get;create
 
 // triggerRollouts triggers rollouts for the specified objects if secret changed and secret existed.
-func (r *VaultSecretReconciler) triggerRollouts(ctx context.Context, vaultSecret *cfyczv1.VaultSecret, changed bool, secretExists bool) error {
+func (r *KeyVaultReconciler) triggerRollouts(ctx context.Context, vaultSecret *cfyczv1.KeyVault, changed bool, secretExists bool) error {
 	if !changed || !secretExists {
 		return nil
 	}
@@ -69,16 +69,16 @@ func (r *VaultSecretReconciler) triggerRollouts(ctx context.Context, vaultSecret
 //
 // For more details, check Reconcile and its Result here:
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.21.0/pkg/reconcile
-func (r *VaultSecretReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
+func (r *KeyVaultReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	log := logf.FromContext(ctx)
 
 	// TODO(user): your logic here
-	var vaultSecret cfyczv1.VaultSecret
+	var vaultSecret cfyczv1.KeyVault
 	if err := r.Get(ctx, req.NamespacedName, &vaultSecret); err != nil {
 		// handle error
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
-	log.Info("Reconciling VaultSecret", "name", vaultSecret.Name, "namespace", vaultSecret.Namespace)
+	log.Info("Reconciling KeyVault", "name", vaultSecret.Name, "namespace", vaultSecret.Namespace)
 
 	// Parse Annotations
 	annotations, err := vaultSecret.ParseAnnotations(vaultSecret.ObjectMeta)
@@ -161,9 +161,9 @@ func (r *VaultSecretReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 }
 
 // SetupWithManager sets up the controller with the Manager.
-func (r *VaultSecretReconciler) SetupWithManager(mgr ctrl.Manager) error {
+func (r *KeyVaultReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
-		For(&cfyczv1.VaultSecret{}).
-		Named("vaultsecret").
+		For(&cfyczv1.KeyVault{}).
+		Named("keyvault").
 		Complete(r)
 }
