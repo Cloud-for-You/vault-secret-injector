@@ -32,6 +32,10 @@ import (
 // EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
 // NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
 
+// VaultSecretDataValue represents a value in StringData with validation.
+// +kubebuilder:validation:Pattern="^[^@]+@[^@]+$"
+type VaultSecretDataValue string
+
 // VaultSecretSpec defines the desired state of VaultSecret.
 type VaultSecretSpec struct {
 	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
@@ -45,7 +49,7 @@ type VaultSecretSpec struct {
 	Immutable bool `json:"immutable,omitempty"`
 	// StringData is an example field of VaultSecret. Edit vaultsecret_types.go to remove/update
 	// +kubebuilder:validation:Optional
-	StringData map[string]string `json:"stringData"`
+	StringData map[string]VaultSecretDataValue `json:"stringData,omitempty"`
 	// stringData allows specifying non-binary secret data in string form. It is
 	// provided as a write-only input field for convenience. All keys and values
 	// are merged into the data field on write, overwriting any existing values.

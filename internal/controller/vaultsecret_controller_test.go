@@ -55,8 +55,18 @@ var _ = Describe("VaultSecret Controller", func() {
 						},
 					},
 					Spec: cfyczv1.VaultSecretSpec{
-						StringData: map[string]string{
-							"key1": "value1",
+						StringData: map[string]cfyczv1.VaultSecretDataValue{
+							"key1": cfyczv1.VaultSecretDataValue("test/path@field1"),
+							"key2": cfyczv1.VaultSecretDataValue("test/path@field2"),
+						},
+						Type:      "Opaque",
+						Immutable: false,
+						RolloutObjectRef: []cfyczv1.RolloutObjectRef{
+							cfyczv1.RolloutObjectRef{
+								APIVersion: "apps/v1",
+								Kind:       "Deployment",
+								Name:       "test-deployment",
+							},
 						},
 					},
 				}

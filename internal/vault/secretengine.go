@@ -129,7 +129,7 @@ func FetchSecretData(vaultClient *vaultapi.Client, impersonateJwt string, annota
 	} else {
 		secretData = make(map[string][]byte)
 		for secretKey, vaultSpec := range vaultSecret.Spec.StringData {
-			parts := strings.Split(vaultSpec, "@")
+			parts := strings.Split(string(vaultSpec), "@")
 			if len(parts) != 2 {
 				return nil, fmt.Errorf("invalid stringData format for key %s: expected <vaultPath>@<key>", secretKey)
 			}

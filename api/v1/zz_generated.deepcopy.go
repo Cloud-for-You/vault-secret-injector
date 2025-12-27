@@ -118,7 +118,7 @@ func (in *VaultSecretSpec) DeepCopyInto(out *VaultSecretSpec) {
 	*out = *in
 	if in.StringData != nil {
 		in, out := &in.StringData, &out.StringData
-		*out = make(map[string]string, len(*in))
+		*out = make(map[string]VaultSecretDataValue, len(*in))
 		for key, val := range *in {
 			(*out)[key] = val
 		}
