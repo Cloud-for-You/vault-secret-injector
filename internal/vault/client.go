@@ -55,12 +55,16 @@ func NewVaultClient() (*vaultapi.Client, error) {
 
 // SetupVaultClient sets up the Vault client and authenticates.
 func SetupVaultClient(ctx context.Context, vaultSecret *cfyczv1.VaultSecret) (*vaultapi.Client, string, error) {
-	clientset := kubernetes.NewForConfigOrDie(ctrl.GetConfigOrDie())
-	impersonateJwt, err := getImpersonateSAToken(ctx, clientset, vaultSecret.GetNamespace(), "default", "serviceaccount", int64(600))
+	annotations, err := vaultSecret.ParseAnnotations(vaultSecret.ObjectMeta)
 	if err != nil {
 		return nil, "", err
 	}
-	LogAudit(impersonateJwt, "Obtained impersonated service account token", map[string]interface{}{"namespace": vaultSecret.GetNamespace(), "serviceAccount": "default"})
+	clientset := kubernetes.NewForConfigOrDie(ctrl.GetConfigOrDie())
+	impersonateJwt, err := getImpersonateSAToken(ctx, clientset, vaultSecret.GetNamespace(), annotations.VaultServiceAccount, "serviceaccount", int64(600))
+	if err != nil {
+		return nil, "", err
+	}
+	LogAudit(impersonateJwt, "Obtained impersonated service account token", map[string]interface{}{"namespace": vaultSecret.GetNamespace(), "serviceAccount": annotations.VaultServiceAccount})
 
 	vaultClient, err := NewVaultClient()
 	if err != nil {

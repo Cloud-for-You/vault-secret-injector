@@ -135,6 +135,7 @@ spec:
 - `vault.hashicorp.com/mount`: Určuje mount point ve Vault (výchozí: `kv-{namespace_name}`)
 - `vault.hashicorp.com/refresh-interval`: Interval pro automatické obnovení dat (výchozí: `5 minut`)
 - `vault.hashicorp.com/secret-name`: Název vytvořeného Kubernetes Secret (výchozí: `název VaultSecret`)
+- `vault.hashicorp.com/service-account`: Jméno ServiceAccount, které se použije pro impersonate JWT tokenu (výchozí: `default`)
 
 ### Automatický rollout aplikací
 Automaticky spoustí rollout (restart) aplikací při aktualizaci tajných údajů do objektu Secret. To zajišťuje, že aplikace okamžitě použijí nové hodnoty bez manuálního zásahu.

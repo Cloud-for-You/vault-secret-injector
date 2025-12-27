@@ -153,6 +153,8 @@ const (
 	AnnotationVaultRefreshInterval = "vault.hashicorp.com/refresh-interval"
 	// Specify the name of the Kubernetes Secret to create/update.
 	AnnotationVaultSecretName = "vault.hashicorp.com/secret-name"
+	// Specify the serviceaccount to use for Vault authentication.
+	AnnotationVaultServiceAccount = "vault.hashicorp.com/service-account"
 )
 
 // VaultSecretAnnotation a list of VaultSecret.
@@ -161,12 +163,14 @@ type VaultSecretAnnotations struct {
 	VaultMount           string        `json:"vaultMount"`
 	VaultRefreshInterval time.Duration `json:"vaultRefreshInterval"`
 	VaultSecretName      string        `json:"vaultSecretName"`
+	VaultServiceAccount  string        `json:"vaultServiceAccount"`
 }
 
 func defaultAnnotations(namespace string) VaultSecretAnnotations {
 	return VaultSecretAnnotations{
 		VaultMount:           "kv-" + namespace,
 		VaultRefreshInterval: 5 * time.Minute,
+		VaultServiceAccount:  "default",
 	}
 }
 
@@ -175,18 +179,12 @@ func (vs *VaultSecret) ParseAnnotations(meta metav1.ObjectMeta) (VaultSecretAnno
 	annotations := defaultAnnotations(meta.Namespace)
 	ann := meta.GetAnnotations()
 
-	if val, ok := ann[AnnotationVaultMount]; ok {
-		annotations.VaultMount = val
-	}
-
-	if val, ok := ann[AnnotationVaultSecretName]; ok {
-		annotations.VaultSecretName = val
-	} else {
-		annotations.VaultSecretName = meta.Name
-	}
-
 	if val, ok := ann[AnnotationVaultPath]; ok {
 		annotations.VaultPath = val
+	}
+
+	if val, ok := ann[AnnotationVaultMount]; ok {
+		annotations.VaultMount = val
 	}
 
 	if val, ok := ann[AnnotationVaultRefreshInterval]; ok {
@@ -195,6 +193,16 @@ func (vs *VaultSecret) ParseAnnotations(meta metav1.ObjectMeta) (VaultSecretAnno
 			return VaultSecretAnnotations{}, err
 		}
 		annotations.VaultRefreshInterval = duration
+	}
+
+	if val, ok := ann[AnnotationVaultSecretName]; ok {
+		annotations.VaultSecretName = val
+	} else {
+		annotations.VaultSecretName = meta.Name
+	}
+
+	if val, ok := ann[AnnotationVaultServiceAccount]; ok {
+		annotations.VaultServiceAccount = val
 	}
 
 	return annotations, nil
