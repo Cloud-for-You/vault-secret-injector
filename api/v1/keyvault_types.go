@@ -32,12 +32,12 @@ import (
 // EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
 // NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
 
-// VaultSecretDataValue represents a value in StringData with validation.
+// KeyVaultDataValue represents a value in StringData with validation.
 // +kubebuilder:validation:Pattern="^[^@]+@[^@]+$"
-type VaultSecretDataValue string
+type KeyVaultDataValue string
 
-// VaultSecretSpec defines the desired state of VaultSecret.
-type VaultSecretSpec struct {
+// KeyVaultSpec defines the desired state of KeyVault.
+type KeyVaultSpec struct {
 	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
 
@@ -48,13 +48,13 @@ type VaultSecretSpec struct {
 	// +kubebuilder:default:=false
 	Immutable bool `json:"immutable,omitempty"`
 
-	// StringData is an example field of VaultSecret. Edit vaultsecret_types.go to remove/update.
+	// StringData is an example field of KeyVault. Edit keyvault_types.go to remove/update.
 	// StringData allows specifying non-binary secret data in string form. It is
 	// provided as a write-only input field for convenience. All keys and values
 	// are merged into the data field on write, overwriting any existing values.
 	// The stringData field is never output when reading from the API.
 	// +kubebuilder:validation:Optional
-	StringData map[string]VaultSecretDataValue `json:"stringData,omitempty"`
+	StringData map[string]KeyVaultDataValue `json:"stringData,omitempty"`
 
 	// Type of the secret, e.g. Opaque, kubernetes.io/dockerconfigjson, etc.
 	// +kubebuilder:validation:Optional
@@ -66,8 +66,8 @@ type VaultSecretSpec struct {
 	RolloutObjectRef []RolloutObjectRef `json:"rolloutObjectsRef,omitempty"`
 }
 
-// VaultSecretStatus defines the observed state of VaultSecret.
-type VaultSecretStatus struct {
+// KeyVaultStatus defines the observed state of KeyVault.
+type KeyVaultStatus struct {
 	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
 	SecretName  string `json:"secretName,omitempty"`
@@ -82,26 +82,26 @@ type VaultSecretStatus struct {
 // +kubebuilder:printcolumn:name="Age",type=date,JSONPath=`.metadata.creationTimestamp`
 // +kubebuilder:printcolumn:name="Message",type=string,JSONPath=`.status.message`
 
-// VaultSecret is the Schema for the vaultsecrets API.
-type VaultSecret struct {
+// KeyVault is the Schema for the keyvaults API.
+type KeyVault struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	Spec   VaultSecretSpec   `json:"spec,omitempty"`
-	Status VaultSecretStatus `json:"status,omitempty"`
+	Spec   KeyVaultSpec   `json:"spec,omitempty"`
+	Status KeyVaultStatus `json:"status,omitempty"`
 }
 
 // +kubebuilder:object:root=true
 
-// VaultSecretList contains a list of VaultSecret.
-type VaultSecretList struct {
+// KeyVaultList contains a list of KeyVault.
+type KeyVaultList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []VaultSecret `json:"items"`
+	Items           []KeyVault `json:"items"`
 }
 
 func init() {
-	SchemeBuilder.Register(&VaultSecret{}, &VaultSecretList{})
+	SchemeBuilder.Register(&KeyVault{}, &KeyVaultList{})
 }
 
 type RolloutObjectRef struct {
@@ -165,8 +165,8 @@ const (
 	AnnotationVaultServiceAccount = "vault.hashicorp.com/service-account"
 )
 
-// VaultSecretAnnotation a list of VaultSecret.
-type VaultSecretAnnotations struct {
+// KeyVaultAnnotation a list of KeyVault.
+type KeyVaultAnnotations struct {
 	VaultPath            string        `json:"vaultPath"`
 	VaultMount           string        `json:"vaultMount"`
 	VaultRefreshInterval time.Duration `json:"vaultRefreshInterval"`
@@ -174,16 +174,16 @@ type VaultSecretAnnotations struct {
 	VaultServiceAccount  string        `json:"vaultServiceAccount"`
 }
 
-func defaultAnnotations(namespace string) VaultSecretAnnotations {
-	return VaultSecretAnnotations{
+func defaultAnnotations(namespace string) KeyVaultAnnotations {
+	return KeyVaultAnnotations{
 		VaultMount:           "kv-" + namespace,
 		VaultRefreshInterval: 5 * time.Minute,
 		VaultServiceAccount:  "default",
 	}
 }
 
-// GetAnnotations parses the annotations from the VaultSecret object.
-func (vs *VaultSecret) ParseAnnotations(meta metav1.ObjectMeta) (VaultSecretAnnotations, error) {
+// GetAnnotations parses the annotations from the KeyVault object.
+func (vs *KeyVault) ParseAnnotations(meta metav1.ObjectMeta) (KeyVaultAnnotations, error) {
 	annotations := defaultAnnotations(meta.Namespace)
 	ann := meta.GetAnnotations()
 
@@ -198,7 +198,7 @@ func (vs *VaultSecret) ParseAnnotations(meta metav1.ObjectMeta) (VaultSecretAnno
 	if val, ok := ann[AnnotationVaultRefreshInterval]; ok {
 		duration, err := time.ParseDuration(val)
 		if err != nil {
-			return VaultSecretAnnotations{}, err
+			return KeyVaultAnnotations{}, err
 		}
 		annotations.VaultRefreshInterval = duration
 	}
@@ -216,7 +216,7 @@ func (vs *VaultSecret) ParseAnnotations(meta metav1.ObjectMeta) (VaultSecretAnno
 	return annotations, nil
 }
 
-func (vs *VaultSecret) CreateOrUpdateK8sSecret(ctx context.Context, c client.Client, secretData map[string][]byte) (bool, error) {
+func (vs *KeyVault) CreateOrUpdateK8sSecret(ctx context.Context, c client.Client, secretData map[string][]byte) (bool, error) {
 	annotations, err := vs.ParseAnnotations(vs.ObjectMeta)
 	if err != nil {
 		return false, err
@@ -269,7 +269,7 @@ func (vs *VaultSecret) CreateOrUpdateK8sSecret(ctx context.Context, c client.Cli
 	return true, nil
 }
 
-func (vs *VaultSecret) HandleSecretAndStatus(ctx context.Context, c client.Client, statusWriter client.StatusWriter, secretData map[string][]byte) (bool, error) {
+func (vs *KeyVault) HandleSecretAndStatus(ctx context.Context, c client.Client, statusWriter client.StatusWriter, secretData map[string][]byte) (bool, error) {
 	changed, err := vs.CreateOrUpdateK8sSecret(ctx, c, secretData)
 	if err != nil {
 		return false, err

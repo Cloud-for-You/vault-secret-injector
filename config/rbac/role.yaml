@@ -35,9 +35,9 @@ rules:
   - update
   - watch
 - apiGroups:
-  - cfy.cz
+  - vaultsecret.cfy.cz
   resources:
-  - vaultsecrets
+  - keyvaults
   verbs:
   - create
   - delete
@@ -47,15 +47,15 @@ rules:
   - update
   - watch
 - apiGroups:
-  - cfy.cz
+  - vaultsecret.cfy.cz
   resources:
-  - vaultsecrets/finalizers
+  - keyvaults/finalizers
   verbs:
   - update
 - apiGroups:
-  - cfy.cz
+  - vaultsecret.cfy.cz
   resources:
-  - vaultsecrets/status
+  - keyvaults/status
   verbs:
   - get
   - patch

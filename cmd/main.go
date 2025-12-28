@@ -206,11 +206,11 @@ func main() {
 		os.Exit(1)
 	}
 
-	if err := (&controller.VaultSecretReconciler{
+	if err := (&controller.KeyVaultReconciler{
 		Client: mgr.GetClient(),
 		Scheme: mgr.GetScheme(),
 	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "VaultSecret")
+		setupLog.Error(err, "unable to create controller", "controller", "KeyVault")
 		os.Exit(1)
 	}
 	// nolint:goconst

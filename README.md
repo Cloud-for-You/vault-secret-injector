@@ -3,7 +3,7 @@
 ## Popis
 Poskytuje komplexní řešení pro správu tajných údajů v Kubernetes prostředí pomocí HashiCorp Vault. Projekt nabízí:
 
-- **Automatickou synchronizaci tajných údajů**: Operator kontinuálně synchronizuje data z Vault do Kubernetes Secrets na základě definovaných VaultSecret CRD
+- **Automatickou synchronizaci tajných údajů**: Operator kontinuálně synchronizuje data z Vault do Kubernetes Secrets na základě definovaných KeyVault CRD
 - **Bezpečnou správu citlivých dat**: Centralizovaná správa tajných údajů s pokročilými bezpečnostními funkcemi Vault
 - **Izolaci na úrovni Namespace**: Každý Namespace má své vlastní Vault politiky a autentizační role
 - **Validaci a automatizaci**: Integrované validační webhooky zajišťují správnou konfiguraci a automatickou správu Vault zdrojů
@@ -87,7 +87,7 @@ vault write auth/${VAULT_K8S_AUTH_MOUNT}/role/vault-secret-injector \
 ```
 
 ### Reconciliation Custom CRD
-Operator implementuje reconciliation smyčku pro VaultSecret CRD, která zajišťuje kontinuální synchronizaci tajných údajů z Vault do Kubernetes Secrets.
+Operator implementuje reconciliation smyčku pro KeyVault CRD, která zajišťuje kontinuální synchronizaci tajných údajů z Vault do Kubernetes Secrets.
 
 #### Možnosti přístupu k citlivým datům
 Operator podporuje dva způsoby přístupu k tajným údajům z Vault:
@@ -102,16 +102,16 @@ Operator podporuje dva způsoby přístupu k tajným údajům z Vault:
    - Operator načte hodnotu specifického klíče z dané cesty ve Vault a uloží ji do Kubernetes Secret pod zadaným klíčem.
    - Příklad: Načtení hesla z `myapp1/config` pod klíčem `DATA1` a z `myapp2/config` pod klíčem `DATA2`.
 
-Musí být definována buď anotace `vault.hashicorp.com/path`, nebo `spec.stringData`. Nelze kombinovat obě metody v jednom VaultSecret. Annotace má přednost před specifikovanými klíči.
+Musí být definována buď anotace `vault.hashicorp.com/path`, nebo `spec.stringData`. Nelze kombinovat obě metody v jednom KeyVault. Annotace má přednost před specifikovanými klíči.
 
 #### Příklady použití
 
 **Načtení všech klíčů z cesty:**
 ```yaml
-apiVersion: cfy.cz/v1
-kind: VaultSecret
+apiVersion: vaultsecret.cfy.cz/v1
+kind: KeyVault
 metadata:
-  name: vaultsecret-all-keys
+  name: keyvault-all-keys
   annotations:
     vault.hashicorp.com/path: "myapp/config"
 spec:
@@ -120,10 +120,10 @@ spec:
 
 **Načtení specifických klíčů:**
 ```yaml
-apiVersion: cfy.cz/v1
-kind: VaultSecret
+apiVersion: vaultsecret.cfy.cz/v1
+kind: KeyVault
 metadata:
-  name: vaultsecret-specific-keys
+  name: keyvault-specific-keys
 spec:
   stringData:
     USERNAME: "myapp1/config@DATA1"
@@ -134,7 +134,7 @@ spec:
 **Další podporované anotace:**
 - `vault.hashicorp.com/mount`: Určuje mount point ve Vault (výchozí: `kv-{namespace_name}`)
 - `vault.hashicorp.com/refresh-interval`: Interval pro automatické obnovení dat (výchozí: `5 minut`)
-- `vault.hashicorp.com/secret-name`: Název vytvořeného Kubernetes Secret (výchozí: `název VaultSecret`)
+- `vault.hashicorp.com/secret-name`: Název vytvořeného Kubernetes Secret (výchozí: `název KeyVault`)
 - `vault.hashicorp.com/service-account`: Jméno ServiceAccount, které se použije pro impersonate JWT tokenu (výchozí: `default`)
 
 ### Automatický rollout aplikací
@@ -144,8 +144,8 @@ Automaticky spoustí rollout (restart) aplikací při aktualizaci tajných údaj
 V `spec.rolloutObjectsRef` můžete specifikovat seznam Kubernetes objektů, které se mají restartovat při změně dat:
 
 ```yaml
-apiVersion: cfy.cz/v1
-kind: VaultSecret
+apiVersion: vaultsecret.cfy.cz/v1
+kind: KeyVault
 metadata:
   name: my-secret
 spec:

@@ -30,7 +30,7 @@ import (
 	cfyczv1 "github.com/cloud-for-you/vault-secret-injector/api/v1"
 )
 
-var _ = Describe("VaultSecret Controller", func() {
+var _ = Describe("KeyVault Controller", func() {
 	Context("When reconciling a resource", func() {
 		const resourceName = "test-resource"
 
@@ -40,13 +40,13 @@ var _ = Describe("VaultSecret Controller", func() {
 			Name:      resourceName,
 			Namespace: "default", // TODO(user):Modify as needed
 		}
-		vaultsecret := &cfyczv1.VaultSecret{}
+		vaultsecret := &cfyczv1.KeyVault{}
 
 		BeforeEach(func() {
-			By("creating the custom resource for the Kind VaultSecret")
+			By("creating the custom resource for the Kind KeyVault")
 			err := k8sClient.Get(ctx, typeNamespacedName, vaultsecret)
 			if err != nil && errors.IsNotFound(err) {
-				resource := &cfyczv1.VaultSecret{
+				resource := &cfyczv1.KeyVault{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      resourceName,
 						Namespace: "default",
@@ -54,10 +54,10 @@ var _ = Describe("VaultSecret Controller", func() {
 							"vault.hashicorp.com/path": "test/path",
 						},
 					},
-					Spec: cfyczv1.VaultSecretSpec{
-						StringData: map[string]cfyczv1.VaultSecretDataValue{
-							"key1": cfyczv1.VaultSecretDataValue("test/path@field1"),
-							"key2": cfyczv1.VaultSecretDataValue("test/path@field2"),
+					Spec: cfyczv1.KeyVaultSpec{
+						StringData: map[string]cfyczv1.KeyVaultDataValue{
+							"key1": cfyczv1.KeyVaultDataValue("test/path@field1"),
+							"key2": cfyczv1.KeyVaultDataValue("test/path@field2"),
 						},
 						Type:      "Opaque",
 						Immutable: false,
@@ -76,16 +76,16 @@ var _ = Describe("VaultSecret Controller", func() {
 
 		AfterEach(func() {
 			// TODO(user): Cleanup logic after each test, like removing the resource instance.
-			resource := &cfyczv1.VaultSecret{}
+			resource := &cfyczv1.KeyVault{}
 			err := k8sClient.Get(ctx, typeNamespacedName, resource)
 			Expect(err).NotTo(HaveOccurred())
 
-			By("Cleanup the specific resource instance VaultSecret")
+			By("Cleanup the specific resource instance KeyVault")
 			Expect(k8sClient.Delete(ctx, resource)).To(Succeed())
 		})
 		It("should successfully reconcile the resource", func() {
 			By("Reconciling the created resource")
-			controllerReconciler := &VaultSecretReconciler{
+			controllerReconciler := &KeyVaultReconciler{
 				Client: k8sClient,
 				Scheme: k8sClient.Scheme(),
 			}
