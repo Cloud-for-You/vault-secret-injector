@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"os"
 
-	cfyczv1 "github.com/cloud-for-you/vault-secret-injector/api/v1"
+	vaultsecretv1 "github.com/cloud-for-you/vault-secret-injector/api/v1"
 	vaultapi "github.com/hashicorp/vault/api"
 	authenticationv1 "k8s.io/api/authentication/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -54,7 +54,7 @@ func NewVaultClient() (*vaultapi.Client, error) {
 }
 
 // SetupVaultClient sets up the Vault client and authenticates.
-func SetupVaultClient(ctx context.Context, vaultSecret *cfyczv1.KeyVault) (*vaultapi.Client, string, error) {
+func SetupVaultClient(ctx context.Context, vaultSecret *vaultsecretv1.KeyVault) (*vaultapi.Client, string, error) {
 	annotations, err := vaultSecret.ParseAnnotations(vaultSecret.ObjectMeta)
 	if err != nil {
 		return nil, "", err

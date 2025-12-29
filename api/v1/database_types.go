@@ -28,8 +28,12 @@ type DatabaseSpec struct {
 	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
 
-	// Foo is an example field of Database. Edit database_types.go to remove/update
-	Foo string `json:"foo,omitempty"`
+	// StringTemplate is an example field of Database. Edit database_types.go to remove/update
+	StringTemplate string `json:"stringTemplate,omitempty"`
+
+	// List of other CRD object for rollout/restart purposes
+	// +kubebuilder:validation:Optional
+	RolloutObjectRef []RolloutObjectRef `json:"rolloutObjectsRef,omitempty"`
 }
 
 // DatabaseStatus defines the observed state of Database.

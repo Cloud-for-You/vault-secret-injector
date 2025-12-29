@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	cfyczv1 "github.com/cloud-for-you/vault-secret-injector/api/v1"
+	vaultsecretv1 "github.com/cloud-for-you/vault-secret-injector/api/v1"
 	vaultapi "github.com/hashicorp/vault/api"
 	k8siov1 "k8s.io/api/core/v1"
 )
@@ -118,7 +118,7 @@ func FetchSecretValue(client *vaultapi.Client, jwt, mount, path string) ([]byte,
 }
 
 // FetchSecretData fetches secret data from Vault based on annotations and spec.
-func FetchSecretData(vaultClient *vaultapi.Client, impersonateJwt string, annotations *cfyczv1.KeyVaultAnnotations, vaultSecret *cfyczv1.KeyVault) (map[string][]byte, error) {
+func FetchSecretData(vaultClient *vaultapi.Client, impersonateJwt string, annotations *vaultsecretv1.VaultSecretAnnotations, vaultSecret *vaultsecretv1.KeyVault) (map[string][]byte, error) {
 	var secretData map[string][]byte
 	if annotations.VaultPath != "" {
 		data, err := FetchSecretEngineKV(vaultClient, impersonateJwt, annotations.VaultMount, annotations.VaultPath)

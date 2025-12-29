@@ -36,6 +36,11 @@ type DatabaseReconciler struct {
 // +kubebuilder:rbac:groups=vaultsecret.cfy.cz,resources=databases,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=vaultsecret.cfy.cz,resources=databases/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=vaultsecret.cfy.cz,resources=databases/finalizers,verbs=update
+// +kubebuilder:rbac:groups=apps,resources=deployments,verbs=list;watch;update;patch
+// +kubebuilder:rbac:groups=apps,resources=statefulsets,verbs=list;watch;update;patch
+// +kubebuilder:rbac:groups=apps,resources=daemonsets,verbs=list;watch;update;patch
+// +kubebuilder:rbac:groups=core,resources=secrets,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=core,resources=serviceaccounts/token,verbs=get;create
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
@@ -50,6 +55,7 @@ func (r *DatabaseReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 	_ = logf.FromContext(ctx)
 
 	// TODO(user): your logic here
+	logf.Log.Info("Reconcile called for Database", "NamespacedName", req.NamespacedName)
 
 	return ctrl.Result{}, nil
 }

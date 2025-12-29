@@ -45,21 +45,6 @@ type KeyVaultReconciler struct {
 // +kubebuilder:rbac:groups=core,resources=secrets,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=core,resources=serviceaccounts/token,verbs=get;create
 
-// triggerRollouts triggers rollouts for the specified objects if secret changed and secret existed.
-func (r *KeyVaultReconciler) triggerRollouts(ctx context.Context, vaultSecret *cfyczv1.KeyVault, changed bool, secretExists bool) error {
-	if !changed || !secretExists {
-		return nil
-	}
-	for _, rolloutRef := range vaultSecret.Spec.RolloutObjectRef {
-		err := rolloutRef.TriggerRollout(ctx, r.Client, vaultSecret.GetNamespace())
-		if err != nil {
-			return err
-		}
-		logf.FromContext(ctx).Info("Triggered rollout for object", "apiVersion", rolloutRef.APIVersion, "kind", rolloutRef.Kind, "name", rolloutRef.Name)
-	}
-	return nil
-}
-
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
 // TODO(user): Modify the Reconcile function to compare the state specified by
@@ -140,7 +125,7 @@ func (r *KeyVaultReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 	}
 
 	// Trigger rollouts
-	err = r.triggerRollouts(ctx, &vaultSecret, changed, secretExists)
+	err = r.TriggerRollouts(ctx, &vaultSecret, changed, secretExists)
 	if err != nil {
 		log.Error(err, "Failed to trigger rollouts")
 		vaultSecret.Status.Message = "Failed to trigger rollouts: " + err.Error()
