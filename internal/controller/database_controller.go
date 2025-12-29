@@ -18,13 +18,16 @@ package controller
 
 import (
 	"context"
+	"fmt"
 
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 
 	vaultsecretv1 "github.com/cloud-for-you/vault-secret-injector/api/v1"
+	"github.com/cloud-for-you/vault-secret-injector/internal/vault"
 )
 
 // DatabaseReconciler reconciles a Database object
@@ -52,10 +55,110 @@ type DatabaseReconciler struct {
 // For more details, check Reconcile and its Result here:
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.21.0/pkg/reconcile
 func (r *DatabaseReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	_ = logf.FromContext(ctx)
+	log := logf.FromContext(ctx)
 
 	// TODO(user): your logic here
-	logf.Log.Info("Reconcile called for Database", "NamespacedName", req.NamespacedName)
+	var database vaultsecretv1.Database
+	if err := r.Get(ctx, req.NamespacedName, &database); err != nil {
+		return ctrl.Result{}, client.IgnoreNotFound(err)
+	}
+	log.Info("Reconciling Database", "name", database.Name, "namespace", database.Namespace)
+
+	// For static creds, hardcoded path
+	mount := "database"
+	path := "static-creds/static"
+
+	// Parse Annotations
+	annotations, err := vaultsecretv1.ParseAnnotations(database.ObjectMeta)
+	if err != nil {
+		log.Error(err, "Failed to parse Database annotations", "name", database.Name, "namespace", database.Namespace)
+		return ctrl.Result{}, err
+	}
+
+	// Validate configuration
+	if annotations.VaultPath == "" && len(database.Spec.StringTemplate) == 0 {
+		err := fmt.Errorf("neither vault path annotation nor stringTemplate specified")
+		log.Error(err, "Invalid configuration", "name", database.Name, "namespace", database.Namespace)
+		return ctrl.Result{}, err
+	}
+
+	// Setup Vault client
+	vaultClient, impersonateJwt, err := vault.SetupVaultClient(ctx, database.ObjectMeta)
+	if err != nil {
+		database.Status.Message = "Failed to setup Vault client: " + err.Error()
+		if updateErr := r.Status().Update(ctx, &database); updateErr != nil {
+			log.Error(updateErr, "Failed to update Database status")
+			return ctrl.Result{}, updateErr
+		}
+		return ctrl.Result{}, err
+	}
+
+	// Fetch database secret
+	vaultDatabaseData, err := vault.FetchSecretEngineDatabase(vaultClient, impersonateJwt, mount, path)
+	if err != nil {
+		database.Status.Message = "Failed to fetch database secret: " + err.Error()
+		if updateErr := r.Status().Update(ctx, &database); updateErr != nil {
+			log.Error(updateErr, "Failed to update Database status")
+			return ctrl.Result{}, updateErr
+		}
+		return ctrl.Result{}, err
+	}
+
+	// Allowed keys in vaultDatabaseData:
+	// last_vault_rotation, Type: string
+	// password, Type: string
+	// rotation_period, Type: json.Number
+	// ttl, Type: json.Number
+	// username, Type: string
+	secretData := make(map[string][]byte)
+	for key, tmpl := range database.Spec.StringTemplate {
+		templatedString, err := vaultsecretv1.TemplatingStringData(tmpl, vaultDatabaseData.Data)
+		if err != nil {
+			database.Status.Message = "Failed to prepare secret data for key " + key + ": " + err.Error()
+			if updateErr := r.Status().Update(ctx, &database); updateErr != nil {
+				log.Error(updateErr, "Failed to update Database status")
+				return ctrl.Result{}, updateErr
+			}
+			return ctrl.Result{}, err
+		}
+		secretData[key] = []byte(templatedString)
+	}
+
+	// Check if Kubernetes Secret already exists
+	secretExists := true
+	k8sSecretCheck := &corev1.Secret{}
+	err = r.Get(ctx, client.ObjectKey{Name: database.Name, Namespace: database.Namespace}, k8sSecretCheck)
+	if err != nil {
+		if client.IgnoreNotFound(err) != nil {
+			return ctrl.Result{}, err
+		}
+		secretExists = false
+	}
+
+	// Handle secret creation/update and status
+	changed, err := database.HandleSecretAndStatus(ctx, r.Client, r.Status(), secretData)
+	if err != nil {
+		database.Status.Message = "Failed to handle secret and status: " + err.Error()
+		if updateErr := r.Status().Update(ctx, &database); updateErr != nil {
+			log.Error(updateErr, "Failed to update Database status")
+			return ctrl.Result{}, updateErr
+		}
+		return ctrl.Result{}, err
+	}
+
+	// Trigger rollouts
+	err = r.TriggerRollouts(ctx, &database, changed, secretExists)
+	if err != nil {
+		log.Error(err, "Failed to trigger rollouts")
+		database.Status.Message = "Failed to trigger rollouts: " + err.Error()
+		if updateErr := r.Status().Update(ctx, &database); updateErr != nil {
+			log.Error(updateErr, "Failed to update Database status")
+			return ctrl.Result{}, updateErr
+		}
+		return ctrl.Result{}, err
+	}
+
+	log.Info("Successfully reconciled Database", "name", database.Name, "namespace", database.Namespace)
 
 	return ctrl.Result{}, nil
 }

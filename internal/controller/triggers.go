@@ -21,3 +21,18 @@ func (r *KeyVaultReconciler) TriggerRollouts(ctx context.Context, vaultSecret *v
 	}
 	return nil
 }
+
+// triggerRollouts triggers rollouts for the specified objects if secret changed and secret existed.
+func (r *DatabaseReconciler) TriggerRollouts(ctx context.Context, database *vaultsecretv1.Database, changed bool, secretExists bool) error {
+	if !changed || !secretExists {
+		return nil
+	}
+	for _, rolloutRef := range database.Spec.RolloutObjectRef {
+		err := rolloutRef.TriggerRollout(ctx, r.Client, database.GetNamespace())
+		if err != nil {
+			return err
+		}
+		logf.FromContext(ctx).Info("Triggered rollout for object", "apiVersion", rolloutRef.APIVersion, "kind", rolloutRef.Kind, "name", rolloutRef.Name)
+	}
+	return nil
+}

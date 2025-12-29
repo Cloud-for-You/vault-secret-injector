@@ -54,24 +54,24 @@ func NewVaultClient() (*vaultapi.Client, error) {
 }
 
 // SetupVaultClient sets up the Vault client and authenticates.
-func SetupVaultClient(ctx context.Context, vaultSecret *vaultsecretv1.KeyVault) (*vaultapi.Client, string, error) {
-	annotations, err := vaultSecret.ParseAnnotations(vaultSecret.ObjectMeta)
+func SetupVaultClient(ctx context.Context, meta metav1.ObjectMeta) (*vaultapi.Client, string, error) {
+	annotations, err := vaultsecretv1.ParseAnnotations(meta)
 	if err != nil {
 		return nil, "", err
 	}
 	clientset := kubernetes.NewForConfigOrDie(ctrl.GetConfigOrDie())
-	impersonateJwt, err := getImpersonateSAToken(ctx, clientset, vaultSecret.GetNamespace(), annotations.VaultServiceAccount, "serviceaccount", int64(600))
+	impersonateJwt, err := getImpersonateSAToken(ctx, clientset, meta.GetNamespace(), annotations.VaultServiceAccount, "serviceaccount", int64(600))
 	if err != nil {
 		return nil, "", err
 	}
-	LogAudit(impersonateJwt, "Obtained impersonated service account token", map[string]interface{}{"namespace": vaultSecret.GetNamespace(), "serviceAccount": annotations.VaultServiceAccount})
+	LogAudit(impersonateJwt, "Obtained impersonated service account token", map[string]interface{}{"namespace": meta.GetNamespace(), "serviceAccount": annotations.VaultServiceAccount})
 
 	vaultClient, err := NewVaultClient()
 	if err != nil {
 		return nil, "", err
 	}
 
-	err = VaultLoginWithK8sAuth(ctx, vaultClient, os.Getenv("VAULT_K8S_AUTH_MOUNT"), impersonateJwt, vaultSecret.GetNamespace())
+	err = VaultLoginWithK8sAuth(ctx, vaultClient, os.Getenv("VAULT_K8S_AUTH_MOUNT"), impersonateJwt, meta.GetNamespace())
 	if err != nil {
 		return nil, "", err
 	}

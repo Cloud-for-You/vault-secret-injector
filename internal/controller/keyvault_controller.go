@@ -26,7 +26,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 
-	cfyczv1 "github.com/cloud-for-you/vault-secret-injector/api/v1"
+	vaultsecretv1 "github.com/cloud-for-you/vault-secret-injector/api/v1"
 	vaultlib "github.com/cloud-for-you/vault-secret-injector/internal/vault"
 )
 
@@ -58,45 +58,44 @@ func (r *KeyVaultReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 	log := logf.FromContext(ctx)
 
 	// TODO(user): your logic here
-	var vaultSecret cfyczv1.KeyVault
-	if err := r.Get(ctx, req.NamespacedName, &vaultSecret); err != nil {
+	var keyVault vaultsecretv1.KeyVault
+	if err := r.Get(ctx, req.NamespacedName, &keyVault); err != nil {
 		// handle error
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
-	log.Info("Reconciling KeyVault", "name", vaultSecret.Name, "namespace", vaultSecret.Namespace)
+	log.Info("Reconciling KeyVault", "name", keyVault.Name, "namespace", keyVault.Namespace)
 
 	// Parse Annotations
-	annotations, err := vaultSecret.ParseAnnotations(vaultSecret.ObjectMeta)
+	annotations, err := vaultsecretv1.ParseAnnotations(keyVault.ObjectMeta)
 	if err != nil {
-		log.Error(err, "Failed to parse VaultSecret annotations", "name", vaultSecret.Name, "namespace", vaultSecret.Namespace)
+		log.Error(err, "Failed to parse KeyVault annotations", "name", keyVault.Name, "namespace", keyVault.Namespace)
 		return ctrl.Result{}, err
 	}
-	log.Info(annotations.VaultPath)
 
 	// Validate configuration
-	if annotations.VaultPath == "" && len(vaultSecret.Spec.StringData) == 0 {
+	if annotations.VaultPath == "" && len(keyVault.Spec.StringData) == 0 {
 		err := fmt.Errorf("neither vault path annotation nor stringData specified")
-		log.Error(err, "Invalid configuration", "name", vaultSecret.Name, "namespace", vaultSecret.Namespace)
+		log.Error(err, "Invalid configuration", "name", keyVault.Name, "namespace", keyVault.Namespace)
 		return ctrl.Result{}, err
 	}
 
 	// Setup Vault client
-	vaultClient, impersonateJwt, err := vaultlib.SetupVaultClient(ctx, &vaultSecret)
+	vaultClient, impersonateJwt, err := vaultlib.SetupVaultClient(ctx, keyVault.ObjectMeta)
 	if err != nil {
-		vaultSecret.Status.Message = "Failed to setup Vault client: " + err.Error()
-		if updateErr := r.Status().Update(ctx, &vaultSecret); updateErr != nil {
-			log.Error(updateErr, "Failed to update VaultSecret status")
+		keyVault.Status.Message = "Failed to setup Vault client: " + err.Error()
+		if updateErr := r.Status().Update(ctx, &keyVault); updateErr != nil {
+			log.Error(updateErr, "Failed to update KeyVault status")
 			return ctrl.Result{}, updateErr
 		}
 		return ctrl.Result{}, err
 	}
 
 	// Fetch secret data
-	secretData, err := vaultlib.FetchSecretData(vaultClient, impersonateJwt, &annotations, &vaultSecret)
+	secretData, err := vaultlib.FetchKVSecret(vaultClient, impersonateJwt, &annotations, &keyVault)
 	if err != nil {
-		vaultSecret.Status.Message = "Failed to fetch secret data: " + err.Error()
-		if updateErr := r.Status().Update(ctx, &vaultSecret); updateErr != nil {
-			log.Error(updateErr, "Failed to update VaultSecret status")
+		keyVault.Status.Message = "Failed to fetch secret data: " + err.Error()
+		if updateErr := r.Status().Update(ctx, &keyVault); updateErr != nil {
+			log.Error(updateErr, "Failed to update KeyVault status")
 			return ctrl.Result{}, updateErr
 		}
 		return ctrl.Result{}, err
@@ -105,7 +104,7 @@ func (r *KeyVaultReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 	// Check if Kubernetes Secret already exists
 	secretExists := true
 	k8sSecretCheck := &corev1.Secret{}
-	err = r.Get(ctx, client.ObjectKey{Name: annotations.VaultSecretName, Namespace: vaultSecret.Namespace}, k8sSecretCheck)
+	err = r.Get(ctx, client.ObjectKey{Name: annotations.VaultSecretName, Namespace: keyVault.Namespace}, k8sSecretCheck)
 	if err != nil {
 		if client.IgnoreNotFound(err) != nil { // Ignore NotFound, but return other errors
 			return ctrl.Result{}, err
@@ -114,29 +113,29 @@ func (r *KeyVaultReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 	}
 
 	// Handle secret creation/update and status
-	changed, err := vaultSecret.HandleSecretAndStatus(ctx, r.Client, r.Status(), secretData)
+	changed, err := keyVault.HandleSecretAndStatus(ctx, r.Client, r.Status(), secretData)
 	if err != nil {
-		vaultSecret.Status.Message = "Failed to handle secret and status: " + err.Error()
-		if updateErr := r.Status().Update(ctx, &vaultSecret); updateErr != nil {
-			log.Error(updateErr, "Failed to update VaultSecret status")
+		keyVault.Status.Message = "Failed to handle secret and status: " + err.Error()
+		if updateErr := r.Status().Update(ctx, &keyVault); updateErr != nil {
+			log.Error(updateErr, "Failed to update KeyVault status")
 			return ctrl.Result{}, updateErr
 		}
 		return ctrl.Result{}, err
 	}
 
 	// Trigger rollouts
-	err = r.TriggerRollouts(ctx, &vaultSecret, changed, secretExists)
+	err = r.TriggerRollouts(ctx, &keyVault, changed, secretExists)
 	if err != nil {
 		log.Error(err, "Failed to trigger rollouts")
-		vaultSecret.Status.Message = "Failed to trigger rollouts: " + err.Error()
-		if updateErr := r.Status().Update(ctx, &vaultSecret); updateErr != nil {
-			log.Error(updateErr, "Failed to update VaultSecret status")
+		keyVault.Status.Message = "Failed to trigger rollouts: " + err.Error()
+		if updateErr := r.Status().Update(ctx, &keyVault); updateErr != nil {
+			log.Error(updateErr, "Failed to update KeyVault status")
 			return ctrl.Result{}, updateErr
 		}
 		return ctrl.Result{}, err
 	}
 
-	log.Info("Successfully reconciled VaultSecret", "name", vaultSecret.Name, "namespace", vaultSecret.Namespace)
+	log.Info("Successfully reconciled VaultSecret", "name", keyVault.Name, "namespace", keyVault.Namespace)
 
 	if annotations.VaultRefreshInterval > 0 {
 		// Requeue after the specified refresh interval
@@ -148,7 +147,7 @@ func (r *KeyVaultReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 // SetupWithManager sets up the controller with the Manager.
 func (r *KeyVaultReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
-		For(&cfyczv1.KeyVault{}).
+		For(&vaultsecretv1.KeyVault{}).
 		Named("keyvault").
 		Complete(r)
 }

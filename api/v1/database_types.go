@@ -29,10 +29,10 @@ type DatabaseSpec struct {
 	// Important: Run "make" to regenerate code after modifying this file
 
 	// StringTemplate is an example field of Database. Edit database_types.go to remove/update
-	StringTemplate string `json:"stringTemplate,omitempty"`
+	StringTemplate map[string]string `json:"stringTemplate,omitempty"`
 
 	// CredsType of database vault creds dynamic or static
-	// +kubebuilder:validation:Optional:enum=dynamic;static
+	// +kubebuilder:validation:Enum=dynamic;static
 	CredsType string `json:"credsType,omitempty"`
 
 	// List of other CRD object for rollout/restart purposes
@@ -44,10 +44,17 @@ type DatabaseSpec struct {
 type DatabaseStatus struct {
 	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
+	SecretName  string `json:"secretName,omitempty"`
+	LastUpdated string `json:"lastUpdated,omitempty"`
+	Message     string `json:"message,omitempty"`
 }
 
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
+// +kubebuilder:printcolumn:name="Secret",type=string,JSONPath=`.status.secretName`
+// +kubebuilder:printcolumn:name="Last Updated",type=string,JSONPath=`.status.lastUpdated`
+// +kubebuilder:printcolumn:name="Age",type=date,JSONPath=`.metadata.creationTimestamp`
+// +kubebuilder:printcolumn:name="Message",type=string,JSONPath=`.status.message`
 
 // Database is the Schema for the databases API.
 type Database struct {

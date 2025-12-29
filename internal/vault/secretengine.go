@@ -64,7 +64,7 @@ func DeleteSecretEngineKV(ctx *k8siov1.Namespace, client *vaultapi.Client, jwt s
 	return nil
 }
 
-// FetchSecretKV fetches a secret from Vault KV v2 engine.
+// FetchSecretEngineKV fetches a secret from Vault KV v2 engine.
 // Parameters:
 // - client: the Vault API client
 // - jwt: the JWT token for auditing
@@ -117,8 +117,30 @@ func FetchSecretValue(client *vaultapi.Client, jwt, mount, path string) ([]byte,
 	return nil, nil // shouldn't reach
 }
 
-// FetchSecretData fetches secret data from Vault based on annotations and spec.
-func FetchSecretData(vaultClient *vaultapi.Client, impersonateJwt string, annotations *vaultsecretv1.VaultSecretAnnotations, vaultSecret *vaultsecretv1.KeyVault) (map[string][]byte, error) {
+// FetchDatabaseSecret fetches database credentials from Vault database engine.
+// Parameters:
+// - client: the Vault API client
+// - jwt: the JWT token for auditing
+// - database: the mount path of the database engine
+// - path: the path to the database role (e.g., static-creds/static)
+// Returns: the secret data as map[string][]byte or error
+func FetchSecretEngineDatabase(client *vaultapi.Client, jwt, database, role string) (*vaultapi.Secret, error) {
+	secretPath := fmt.Sprintf("%s/%s", database, role)
+	secret, err := client.Logical().Read(secretPath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read database secret at %s: %w", secretPath, err)
+	}
+	if secret == nil || secret.Data == nil {
+		return nil, fmt.Errorf("no data found at %s", secretPath)
+	}
+
+	LogAudit(jwt, "Fetched database secret from Vault", map[string]interface{}{"database": database, "role": role})
+
+	return secret, nil
+}
+
+// FetchKVSecret fetches secret data from Vault based on annotations and spec.
+func FetchKVSecret(vaultClient *vaultapi.Client, impersonateJwt string, annotations *vaultsecretv1.VaultSecretAnnotations, vaultSecret *vaultsecretv1.KeyVault) (map[string][]byte, error) {
 	var secretData map[string][]byte
 	if annotations.VaultPath != "" {
 		data, err := FetchSecretEngineKV(vaultClient, impersonateJwt, annotations.VaultMount, annotations.VaultPath)

@@ -24,15 +24,28 @@ Operator podporuje dva typy databázových přihlašovacích údajů z Vault:
    - Credentials jsou trvalé a nemění se.
    - Vhodné pro scénáře, kde je potřeba stabilní přístup.
 
+   **Proměnné pro templating:**
+   - `{{ .username }}`: Uživatelské jméno
+   - `{{ .password }}`: Heslo
+   - `{{ .last_vault_rotation }}`: Čas poslední rotace v Vault (ISO 8601 formát)
+   - `{{ .rotation_period }}`: Perioda rotace v sekundách
+   - `{{ .ttl }}`: Time-to-live v sekundách
+
 Typ credentials se specifikuje v poli `spec.credsType` jako `dynamic` nebo `static`.
 
 ### Šablona připojovacího řetězce
 
-Pole `spec.stringTemplate` umožňuje definovat šablonu pro připojovací řetězec k databázi. Šablona může obsahovat placeholdery, které se nahradí skutečnými hodnotami z Vault.
+Pole `spec.stringTemplate` je mapa řetězců (`map[string]string`), kde každý klíč představuje název klíče v Kubernetes Secret a hodnota je šablona řetězce s placeholdery, které se nahradí skutečnými hodnotami z Vault.
 
-Příklad šablony: `postgresql://{{username}}:{{password}}@{{host}}:{{port}}/{{database}}`
+Příklad šablony:
 
-Operator nahradí `{{username}}`, `{{password}}` atd. hodnotami získanými z Vault.
+```yaml
+stringTemplate:
+  connectionString: "postgresql://{{ .username }}:{{ .password }}@db.example.com:5432/mydb"
+  username: "{{ .username }}"
+```
+
+Operator nahradí `{{ .username }}`, `{{ .password }}` atd. hodnotami získanými z Vault a vytvoří Secret s odpovídajícími klíči.
 
 ### Příklady použití
 
@@ -44,7 +57,8 @@ metadata:
   name: database-dynamic
 spec:
   credsType: dynamic
-  stringTemplate: "postgresql://{{username}}:{{password}}@db.example.com:5432/mydb"
+  stringTemplate:
+    connectionString: "postgresql://{{ .username }}:{{ .password }}@db.example.com:5432/mydb"
 ```
 
 **Static credentials:**
@@ -55,10 +69,11 @@ metadata:
   name: database-static
 spec:
   credsType: static
-  stringTemplate: "mysql://{{username}}:{{password}}@db.example.com:3306/mydb"
+  stringTemplate:
+    connectionString: "mysql://{{ .username }}:{{ .password }}@db.example.com:3306/mydb"
 ```
 
-**Další podporované anotace:**
+**Podporované anotace:**
 - `vault.hashicorp.com/mount`: Určuje mount point ve Vault (výchozí: `database`)
 - `vault.hashicorp.com/role`: Název role pro databázové credentials (používá se pro dynamic creds)
 - `vault.hashicorp.com/refresh-interval`: Interval pro automatické obnovení dat (výchozí: `5 minut`)
@@ -80,7 +95,8 @@ metadata:
   name: my-database
 spec:
   credsType: dynamic
-  stringTemplate: "postgresql://{{username}}:{{password}}@db.example.com:5432/mydb"
+  stringTemplate:
+    connectionString: "postgresql://{{ .username }}:{{ .password }}@db.example.com:5432/mydb"
   rolloutObjectsRef:
   - apiVersion: apps/v1
     kind: Deployment

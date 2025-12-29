@@ -20,8 +20,10 @@ limitations under the License.
 package v1
 
 import (
+	"bytes"
 	"context"
 	"fmt"
+	"html/template"
 	"reflect"
 	"time"
 
@@ -96,7 +98,7 @@ func (r *RolloutObjectRef) TriggerRollout(ctx context.Context, c client.Client, 
 }
 
 func (vs *KeyVault) CreateOrUpdateK8sSecret(ctx context.Context, c client.Client, secretData map[string][]byte) (bool, error) {
-	annotations, err := vs.ParseAnnotations(vs.ObjectMeta)
+	annotations, err := ParseAnnotations(vs.ObjectMeta)
 	if err != nil {
 		return false, err
 	}
@@ -164,6 +166,70 @@ func (vs *KeyVault) HandleSecretAndStatus(ctx context.Context, c client.Client, 
 	return changed, nil
 }
 
+func (db *Database) CreateOrUpdateK8sSecret(ctx context.Context, c client.Client, secretData map[string][]byte) (bool, error) {
+	// For Database, secret name is the name of the Database resource
+	secretName := db.Name
+	secretNamespace := db.Namespace
+
+	// Add owner reference
+	ownerRef := metav1.NewControllerRef(db, db.GroupVersionKind())
+
+	k8sSecret := &corev1.Secret{}
+	err := c.Get(ctx, client.ObjectKey{Name: secretName, Namespace: secretNamespace}, k8sSecret)
+	if err != nil {
+		// Secret does not exist, create it
+		newSecret := &corev1.Secret{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      secretName,
+				Namespace: secretNamespace,
+				OwnerReferences: []metav1.OwnerReference{
+					*ownerRef,
+				},
+			},
+			Data: secretData,
+			Type: corev1.SecretTypeOpaque, // Always opaque for database secrets
+		}
+		if err := c.Create(ctx, newSecret); err != nil {
+			return false, err
+		}
+		db.Status.SecretName = secretName
+		return true, nil
+	}
+
+	// Secret exists, check if data changed
+	if reflect.DeepEqual(k8sSecret.Data, secretData) && k8sSecret.Type == corev1.SecretTypeOpaque {
+		// No change needed
+		db.Status.SecretName = secretName
+		return false, nil
+	}
+
+	// Update it
+	k8sSecret.Data = secretData
+	k8sSecret.Type = corev1.SecretTypeOpaque
+
+	if err := c.Update(ctx, k8sSecret); err != nil {
+		return false, err
+	}
+	db.Status.SecretName = secretName
+	return true, nil
+}
+
+func (db *Database) HandleSecretAndStatus(ctx context.Context, c client.Client, statusWriter client.StatusWriter, secretData map[string][]byte) (bool, error) {
+	changed, err := db.CreateOrUpdateK8sSecret(ctx, c, secretData)
+	if err != nil {
+		return false, err
+	}
+
+	// Update LastUpdated timestamp only if data changed
+	if changed {
+		db.Status.LastUpdated = metav1.Now().Format(time.RFC3339)
+	}
+	if updateErr := statusWriter.Update(ctx, db); updateErr != nil {
+		return false, updateErr
+	}
+	return changed, nil
+}
+
 const (
 	// Specify required mount point in Vault to fetch the secret from.
 	AnnotationVaultMount = "vault.hashicorp.com/mount"
@@ -197,7 +263,7 @@ func defaultAnnotations(namespace string) VaultSecretAnnotations {
 }
 
 // GetAnnotations parses the annotations from the KeyVault object.
-func (vs *KeyVault) ParseAnnotations(meta metav1.ObjectMeta) (VaultSecretAnnotations, error) {
+func ParseAnnotations(meta metav1.ObjectMeta) (VaultSecretAnnotations, error) {
 	annotations := defaultAnnotations(meta.Namespace)
 	ann := meta.GetAnnotations()
 
@@ -228,4 +294,21 @@ func (vs *KeyVault) ParseAnnotations(meta metav1.ObjectMeta) (VaultSecretAnnotat
 	}
 
 	return annotations, nil
+}
+
+// Prepare string for secret data
+// Input go template string and values to substitute
+// Returns prepared string or error
+func TemplatingStringData(tmpl string, values any) (string, error) {
+	t, err := template.New("secret").Parse(tmpl)
+	if err != nil {
+		return "", err
+	}
+
+	var buf bytes.Buffer
+	if err := t.Execute(&buf, values); err != nil {
+		return "", err
+	}
+
+	return buf.String(), nil
 }
