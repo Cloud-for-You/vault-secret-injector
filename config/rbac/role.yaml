@@ -37,6 +37,7 @@ rules:
 - apiGroups:
   - vaultsecret.cfy.cz
   resources:
+  - databases
   - keyvaults
   verbs:
   - create
@@ -49,12 +50,14 @@ rules:
 - apiGroups:
   - vaultsecret.cfy.cz
   resources:
+  - databases/finalizers
   - keyvaults/finalizers
   verbs:
   - update
 - apiGroups:
   - vaultsecret.cfy.cz
   resources:
+  - databases/status
   - keyvaults/status
   verbs:
   - get

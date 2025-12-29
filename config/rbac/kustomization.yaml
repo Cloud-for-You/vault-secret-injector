@@ -23,6 +23,9 @@ resources:
 # default, aiding admins in cluster management. Those roles are
 # not used by the vault-secret-injector itself. You can comment the following lines
 # if you do not want those helpers be installed with your Project.
+- database_admin_role.yaml
+- database_editor_role.yaml
+- database_viewer_role.yaml
 - keyvault_admin_role.yaml
 - keyvault_editor_role.yaml
 - keyvault_viewer_role.yaml

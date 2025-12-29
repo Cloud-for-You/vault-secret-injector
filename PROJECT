@@ -2,7 +2,7 @@
 # This file is used to track the info used to scaffold your project
 # and allow the plugins properly work.
 # More info: https://book.kubebuilder.io/reference/project-config.html
-domain: vaultsecret.cfy.cz
+domain: cfy.cz
 layout:
 - go.kubebuilder.io/v4
 plugins:
@@ -15,7 +15,8 @@ resources:
     crdVersion: v1
     namespaced: true
   controller: true
-  domain: vaultsecret.cfy.cz
+  domain: cfy.cz
+  group: vaultsecret
   kind: KeyVault
   path: github.com/cloud-for-you/vault-secret-injector/api/v1
   version: v1
@@ -27,4 +28,13 @@ resources:
   webhooks:
     validation: true
     webhookVersion: v1
+- api:
+    crdVersion: v1
+    namespaced: true
+  controller: true
+  domain: cfy.cz
+  group: vaultsecret
+  kind: Database
+  path: github.com/cloud-for-you/vault-secret-injector/api/v1
+  version: v1
 version: "3"

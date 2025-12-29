@@ -39,7 +39,7 @@ import (
 
 	k8siov1 "k8s.io/api/core/v1"
 
-	cfyczv1 "github.com/cloud-for-you/vault-secret-injector/api/v1"
+	vaultsecretv1 "github.com/cloud-for-you/vault-secret-injector/api/v1"
 	"github.com/cloud-for-you/vault-secret-injector/internal/controller"
 	webhookv1 "github.com/cloud-for-you/vault-secret-injector/internal/webhook/v1"
 	// +kubebuilder:scaffold:imports
@@ -53,7 +53,7 @@ var (
 func init() {
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
 
-	utilruntime.Must(cfyczv1.AddToScheme(scheme))
+	utilruntime.Must(vaultsecretv1.AddToScheme(scheme))
 	utilruntime.Must(k8siov1.AddToScheme(scheme))
 	// +kubebuilder:scaffold:scheme
 }
@@ -219,6 +219,13 @@ func main() {
 			setupLog.Error(err, "unable to create webhook", "webhook", "Namespace")
 			os.Exit(1)
 		}
+	}
+	if err := (&controller.DatabaseReconciler{
+		Client: mgr.GetClient(),
+		Scheme: mgr.GetScheme(),
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "Database")
+		os.Exit(1)
 	}
 	// +kubebuilder:scaffold:builder
 
