@@ -31,6 +31,10 @@ type DatabaseSpec struct {
 	// StringTemplate is an example field of Database. Edit database_types.go to remove/update
 	StringTemplate string `json:"stringTemplate,omitempty"`
 
+	// CredsType of database vault creds dynamic or static
+	// +kubebuilder:validation:Optional:enum=dynamic;static
+	CredsType string `json:"credsType,omitempty"`
+
 	// List of other CRD object for rollout/restart purposes
 	// +kubebuilder:validation:Optional
 	RolloutObjectRef []RolloutObjectRef `json:"rolloutObjectsRef,omitempty"`

@@ -22,6 +22,7 @@ Je ideální pro organizace, které potřebují:
 - [Nastavení HashiCorp Vault](docs/vault-setup.md)
 - [Validating Webhook](docs/validating-webhook.md)
 - [Správa CR KeyVault](docs/keyvault-management.md)
+- [Správa CR Database](docs/database-management.md)
 
 ## Getting Started
 
