@@ -74,8 +74,8 @@ spec:
 ```
 
 **Podporované anotace:**
-- `vault.hashicorp.com/mount`: Určuje mount point ve Vault (výchozí: `database`)
-- `vault.hashicorp.com/role`: Název role pro databázové credentials (používá se pro dynamic creds)
+- `vault.hashicorp.com/database`: Pojmenování databáze ve vaultu, ke které budeme požadovat credentials 
+- `vault.hashicorp.com/role`: Název role pro databázové credentials 
 - `vault.hashicorp.com/refresh-interval`: Interval pro automatické obnovení dat (výchozí: `5 minut`)
 - `vault.hashicorp.com/secret-name`: Název vytvořeného Kubernetes Secret (výchozí: `název Database`)
 - `vault.hashicorp.com/service-account`: Jméno ServiceAccount, které se použije pro impersonate JWT tokenu (výchozí: `default`)

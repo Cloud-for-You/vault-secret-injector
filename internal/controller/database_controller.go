@@ -69,15 +69,15 @@ func (r *DatabaseReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 	path := "static-creds/static"
 
 	// Parse Annotations
-	annotations, err := vaultsecretv1.ParseAnnotations(database.ObjectMeta)
+	annotations, err := vaultsecretv1.ParseAnnotations(&database.ObjectMeta)
 	if err != nil {
 		log.Error(err, "Failed to parse Database annotations", "name", database.Name, "namespace", database.Namespace)
 		return ctrl.Result{}, err
 	}
 
 	// Validate configuration
-	if annotations.VaultPath == "" && len(database.Spec.StringTemplate) == 0 {
-		err := fmt.Errorf("neither vault path annotation nor stringTemplate specified")
+	if annotations.VaultDatabaseName == "" && annotations.VaultDatabaseRole == "" {
+		err := fmt.Errorf("neither vault database and role annotations are nor specified")
 		log.Error(err, "Invalid configuration", "name", database.Name, "namespace", database.Namespace)
 		return ctrl.Result{}, err
 	}

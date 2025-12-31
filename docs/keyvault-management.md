@@ -53,8 +53,9 @@ spec:
   type: Opaque
 ```
 
-**Další podporované anotace:**
+**Podporované anotace:**
 - `vault.hashicorp.com/mount`: Určuje mount point ve Vault (výchozí: `kv-{namespace_name}`)
+- `vault.hashicorp.com/path`: Určuje mount point ve Vault (výchozí: `kv-{namespace_name}`)
 - `vault.hashicorp.com/refresh-interval`: Interval pro automatické obnovení dat (výchozí: `5 minut`)
 - `vault.hashicorp.com/secret-name`: Název vytvořeného Kubernetes Secret (výchozí: `název KeyVault`)
 - `vault.hashicorp.com/service-account`: Jméno ServiceAccount, které se použije pro impersonate JWT tokenu (výchozí: `default`)

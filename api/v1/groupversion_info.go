@@ -98,7 +98,7 @@ func (r *RolloutObjectRef) TriggerRollout(ctx context.Context, c client.Client, 
 }
 
 func (vs *KeyVault) CreateOrUpdateK8sSecret(ctx context.Context, c client.Client, secretData map[string][]byte) (bool, error) {
-	annotations, err := ParseAnnotations(vs.ObjectMeta)
+	annotations, err := ParseAnnotations(&vs.ObjectMeta)
 	if err != nil {
 		return false, err
 	}
@@ -237,6 +237,10 @@ const (
 	// If specified fetch all keys from this path.
 	// If not specified, fetch only data from keys defined in spec.stringData
 	AnnotationVaultPath = "vault.hashicorp.com/path"
+	// Specify database name in Vault to fetch the secret from.
+	AnnotationsVaultDatabase = "vault.hashicorp.com/database"
+	// Specify the role name in Vault to fetch the secret from.
+	AnnotationsVaultRoleName = "vault.hashicorp.com/role"
 	// Specify how often to refresh the secret from Vault.
 	AnnotationVaultRefreshInterval = "vault.hashicorp.com/refresh-interval"
 	// Specify the name of the Kubernetes Secret to create/update.
@@ -247,24 +251,29 @@ const (
 
 // VaultSecretAnnotations a list of KeyVault.
 type VaultSecretAnnotations struct {
+	// Support fot KeyVault secret engine
 	VaultPath            string        `json:"vaultPath"`
 	VaultMount           string        `json:"vaultMount"`
+	// Support for Database secret engine
+	VaultDatabaseName    string        `json:"vaultDatabaseName"`
+	VaultDatabaseRole    string        `json:"vaultDatabaseRole"`
+	// Support for global settings 
 	VaultRefreshInterval time.Duration `json:"vaultRefreshInterval"`
 	VaultSecretName      string        `json:"vaultSecretName"`
 	VaultServiceAccount  string        `json:"vaultServiceAccount"`
 }
 
-func defaultAnnotations(namespace string) VaultSecretAnnotations {
+func defaultAnnotations(meta *metav1.ObjectMeta) VaultSecretAnnotations {
 	return VaultSecretAnnotations{
-		VaultMount:           "kv-" + namespace,
+		VaultMount:           "kv-" + meta.GetNamespace(),
 		VaultRefreshInterval: 5 * time.Minute,
 		VaultServiceAccount:  "default",
 	}
 }
 
 // GetAnnotations parses the annotations from the KeyVault object.
-func ParseAnnotations(meta metav1.ObjectMeta) (VaultSecretAnnotations, error) {
-	annotations := defaultAnnotations(meta.Namespace)
+func ParseAnnotations(meta *metav1.ObjectMeta) (VaultSecretAnnotations, error) {
+	annotations := defaultAnnotations(meta)
 	ann := meta.GetAnnotations()
 
 	if val, ok := ann[AnnotationVaultPath]; ok {

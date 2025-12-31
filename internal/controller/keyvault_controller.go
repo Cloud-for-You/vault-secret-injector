@@ -66,7 +66,7 @@ func (r *KeyVaultReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 	log.Info("Reconciling KeyVault", "name", keyVault.Name, "namespace", keyVault.Namespace)
 
 	// Parse Annotations
-	annotations, err := vaultsecretv1.ParseAnnotations(keyVault.ObjectMeta)
+	annotations, err := vaultsecretv1.ParseAnnotations(&keyVault.ObjectMeta)
 	if err != nil {
 		log.Error(err, "Failed to parse KeyVault annotations", "name", keyVault.Name, "namespace", keyVault.Namespace)
 		return ctrl.Result{}, err

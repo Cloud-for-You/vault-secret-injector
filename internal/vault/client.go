@@ -55,7 +55,7 @@ func NewVaultClient() (*vaultapi.Client, error) {
 
 // SetupVaultClient sets up the Vault client and authenticates.
 func SetupVaultClient(ctx context.Context, meta metav1.ObjectMeta) (*vaultapi.Client, string, error) {
-	annotations, err := vaultsecretv1.ParseAnnotations(meta)
+	annotations, err := vaultsecretv1.ParseAnnotations(&meta)
 	if err != nil {
 		return nil, "", err
 	}
