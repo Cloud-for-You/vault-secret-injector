@@ -76,7 +76,7 @@ func (r *DatabaseReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 	}
 
 	// Validate configuration
-	if annotations.VaultDatabaseName == "" && annotations.VaultDatabaseRole == "" {
+	if annotations.VaultDBMount == "" && annotations.VaultDBRole == "" {
 		err := fmt.Errorf("neither vault database and role annotations are nor specified")
 		log.Error(err, "Invalid configuration", "name", database.Name, "namespace", database.Namespace)
 		return ctrl.Result{}, err

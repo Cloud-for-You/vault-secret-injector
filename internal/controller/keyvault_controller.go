@@ -73,7 +73,7 @@ func (r *KeyVaultReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 	}
 
 	// Validate configuration
-	if annotations.VaultPath == "" && len(keyVault.Spec.StringData) == 0 {
+	if annotations.VaultKVPath == "" && len(keyVault.Spec.StringData) == 0 {
 		err := fmt.Errorf("neither vault path annotation nor stringData specified")
 		log.Error(err, "Invalid configuration", "name", keyVault.Name, "namespace", keyVault.Namespace)
 		return ctrl.Result{}, err
