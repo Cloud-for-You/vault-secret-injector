@@ -5,5 +5,5 @@ on:
 jobs:
   build-image-container:
     name: BUILD
-    uses: Cloud-for-You/github-workflows/.github/workflows/build-go-container.yaml@main
+    uses: Cloud-for-You/github-workflows/.github/workflows/build-go-container.yaml@v1.0.0
     secrets: inherit
