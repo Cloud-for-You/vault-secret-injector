@@ -29,7 +29,7 @@ jobs:
       - name: Setup Helm
         uses: azure/setup-helm@v4
 
-      - name: Add helm repository 
+      - name: Add Helm repository 
         run: |
           helm repo add hashicorp https://helm.releases.hashicorp.com
           helm repo update
@@ -52,22 +52,19 @@ jobs:
           echo "Checking pod status..."
           kubectl -n hscp-vault get pods -o wide
           
-          # Get deployment status and verify replica count
-          echo "Checking deployment status..."
-          kubectl -n hscp-vault get deployment
-          
-          # Wait for deployment to be fully rolled out (all replicas ready)
-          kubectl -n hscp-vault rollout status deployment/vault --timeout=300s
+          # Get statefulset status and verify replica count
+          echo "Checking statefulset status..."
+          kubectl -n hscp-vault get statefulset
           
           # Additional verification - check that all replicas are available
-          REPLICAS=$(kubectl -n hscp-vault get deployment vault -o jsonpath='{.spec.replicas}')
-          READY_REPLICAS=$(kubectl -n hscp-vault get deployment vault -o jsonpath='{.status.readyReplicas}')
+          REPLICAS=$(kubectl -n hscp-vault get statefulset vault -o jsonpath='{.spec.replicas}')
+          READY_REPLICAS=$(kubectl -n hscp-vault get statefulset vault -o jsonpath='{.status.readyReplicas}')
           echo "Expected replicas: $REPLICAS, Ready replicas: $READY_REPLICAS"
           if [ "$READY_REPLICAS" -lt "$REPLICAS" ]; then
             echo "ERROR: Not all replicas are ready"
             exit 1
           fi
-          echo "Vault deployment verified - all replicas are ready"
+          echo "Vault statefulset verified - all replicas are ready"
 
 #  build-vault-secret-injector:
 #    name: Build docker container
