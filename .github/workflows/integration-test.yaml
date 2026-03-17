@@ -1,0 +1,95 @@
+name: Integration Test
+
+on:
+  workflow_dispatch:
+  pull_request:
+
+jobs:
+  setup-kind:
+    name: Setup Kind Cluster
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check available ports
+        run: |
+          if lsof -i :80 > /dev/null 2>&1 || lsof -i :443 > /dev/null 2>&1; then
+            echo "Warning: Port 80 or 443 may be in use"
+          fi
+
+      - name: Install Kind
+        uses: helm/kind-action@v1
+        with:
+          cluster_name: kind-cluster
+          node_image: kindest/node:v1.28.0
+
+      - name: Verify Kind cluster
+        run: |
+          kubectl cluster-info
+          kubectl get nodes
+
+#  setup-hscp-vault:
+#    name: Deploy Hashicorp vault
+#    runs-on: ubuntu-latest
+#    steps:
+#      - name: Deploy helmchart
+#        uses: todo
+#    
+#  build-vault-secret-injector:
+#    name: Build docker container
+#    runs-on: ubuntu-latest
+#    steps:
+#      - name: Build docker container
+#        uses: todo
+#      - name: Import docker container to Kind cluster 
+#        uses: todo
+#
+#  deploy-vault-secret-injector:
+#    name: Install vault-secret-injector
+#    runs-on: ubuntu-latest
+#    steps:
+
+
+
+
+
+
+
+#  install-manifest:
+#    name: Install Manifest
+#    needs: setup-kind
+#    runs-on: ubuntu-latest
+#    steps:
+#      - name: Checkout repository
+#        uses: actions/checkout@v4
+#
+#      - name: Setup Kustomize
+#        run: |
+#          curl -s "https://raw.githubusercontent.com/kubernetes-sigs/kustomize/master/hack/install_kustomize.sh" | bash -s -- 5.4.3
+#          sudo mv kustomize /usr/local/bin/
+#
+#      - name: Install Cert Manager
+#        run: |
+#          kubectl apply -f https://github.com/cert-manager/cert-manager/releases/download/v1.14.0/cert-manager.yaml
+#
+#      - name: Wait for Cert Manager
+#        run: |
+#          kubectl wait --for=condition=Ready pods -l app.kubernetes.io/instance=cert-manager -n cert-manager --timeout=300s
+#
+#      - name: Set image in config
+#        run: |
+#          cd config/manager && /usr/local/bin/kustomize edit set image controller=controller:latest
+#
+#      - name: Build and apply manifests
+#        run: |
+#          kubectl apply -k config/crd
+#          kubectl apply -k config/default
+#
+#      - name: Verify deployment
+#        run: |
+#          kubectl get pods -n vault-secret-injector-system
+#          kubectl get crds
+#
+#      - name: Show controller logs
+#        if: failure()
+#        run: |
+#          kubectl logs -n vault-secret-injector-system -l control-plane=controller-manager --tail=50
+
