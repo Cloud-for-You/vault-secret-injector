@@ -28,6 +28,7 @@ jobs:
 
   setup-hscp-vault:
     name: Deploy Hashicorp vault
+    needs: setup-kind
     runs-on: ubuntu-latest
     steps:
       - name: Setup Helm
