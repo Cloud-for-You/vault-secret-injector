@@ -5,8 +5,8 @@ on:
   pull_request:
 
 jobs:
-  setup-kind:
-    name: Setup Kind Cluster
+  setup-kind-and-vault:
+    name: Setup Kind Cluster and Deploy Hashicorp Vault
     runs-on: ubuntu-latest
     steps:
       - name: Check available ports
@@ -26,11 +26,6 @@ jobs:
           kubectl cluster-info
           kubectl get nodes
 
-  setup-hscp-vault:
-    name: Deploy Hashicorp vault
-    needs: setup-kind
-    runs-on: ubuntu-latest
-    steps:
       - name: Setup Helm
         uses: azure/setup-helm@v4
 
@@ -73,7 +68,7 @@ jobs:
             exit 1
           fi
           echo "Vault deployment verified - all replicas are ready"
-    
+
 #  build-vault-secret-injector:
 #    name: Build docker container
 #    runs-on: ubuntu-latest
@@ -87,9 +82,6 @@ jobs:
 #    name: Install vault-secret-injector
 #    runs-on: ubuntu-latest
 #    steps:
-
-
-
 
 
 
@@ -133,4 +125,3 @@ jobs:
 #        if: failure()
 #        run: |
 #          kubectl logs -n vault-secret-injector-system -l control-plane=controller-manager --tail=50
-
