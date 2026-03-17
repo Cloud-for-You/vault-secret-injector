@@ -26,13 +26,53 @@ jobs:
           kubectl cluster-info
           kubectl get nodes
 
-#  setup-hscp-vault:
-#    name: Deploy Hashicorp vault
-#    runs-on: ubuntu-latest
-#    steps:
-#      - name: Deploy helmchart
-#        uses: todo
-#    
+  setup-hscp-vault:
+    name: Deploy Hashicorp vault
+    runs-on: ubuntu-latest
+    steps:
+      - name: Setup Helm
+        uses: azure/setup-helm@v4
+
+      - name: Add helm repository 
+        run: |
+          helm repo add hashicorp https://helm.releases.hashicorp.com
+          helm repo update
+      
+      - name: Install Hashicorp Vault
+        run: |
+          helm install vault hashicorp/vault \
+            --namespace hscp-vault \
+            --create-namespace \
+            --set server.dev.enabled=true \
+            --set server.dev.devRootToken=test \
+            --set injector.enabled=false
+
+      - name: Wait and verify install hashicorp vault
+        run: |
+          # Wait for all pods in hscp-vault namespace to be ready
+          kubectl -n hscp-vault wait --for=condition=Ready pods --all --timeout=300s
+          
+          # Verify all pods are running and ready
+          echo "Checking pod status..."
+          kubectl -n hscp-vault get pods -o wide
+          
+          # Get deployment status and verify replica count
+          echo "Checking deployment status..."
+          kubectl -n hscp-vault get deployment
+          
+          # Wait for deployment to be fully rolled out (all replicas ready)
+          kubectl -n hscp-vault rollout status deployment/vault --timeout=300s
+          
+          # Additional verification - check that all replicas are available
+          REPLICAS=$(kubectl -n hscp-vault get deployment vault -o jsonpath='{.spec.replicas}')
+          READY_REPLICAS=$(kubectl -n hscp-vault get deployment vault -o jsonpath='{.status.readyReplicas}')
+          echo "Expected replicas: $REPLICAS, Ready replicas: $READY_REPLICAS"
+          if [ "$READY_REPLICAS" -lt "$REPLICAS" ]; then
+            echo "ERROR: Not all replicas are ready"
+            exit 1
+          fi
+          echo "Vault deployment verified - all replicas are ready"
+    
 #  build-vault-secret-injector:
 #    name: Build docker container
 #    runs-on: ubuntu-latest
