@@ -141,12 +141,12 @@ jobs:
           cache-from: type=local,src=/tmp/.buildx-cache
           cache-to: type=gha,mode=max
       - name: Set container expiration in Quay.io
-        if: ${{ inputs.expired && inputs.oci_registry_url == 'quay.io' }}
+        if: ${{ inputs.expired }}
         env:
-          QUAY_TOKEN: ${{ secrets.QUAY_TOKEN }}
-          ORG: ${{ needs.vars.outputs.organization }}
-          REPO: ${{ needs.vars.outputs.repository_name }}
-          TAG: ${{ inputs.VERSION }}
+          QUAY_TOKEN: ${{ secrets.OCI_REGISTRY_PASSWORD }}
+          ORG: ${{ needs.prerequisites.outputs.organization }}
+          REPO: ${{ needs.prerequisites.outputs.repository_name }}
+          TAG: ${{ inputs.version }}
           EXPIRE: ${{ inputs.expire_duration }}
         run: |
           echo "Input expire duration: $EXPIRE"
