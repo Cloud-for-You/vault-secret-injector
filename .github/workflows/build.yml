@@ -54,9 +54,9 @@ jobs:
       matrix:
         platform:
           - linux/amd64
-          - linux/arm64
-          - darwin/amd64
-          - darwin/arm64
+#          - linux/arm64
+#          - darwin/amd64
+#          - darwin/arm64
     steps:
       - name: Checkout
         uses: actions/checkout@v6
