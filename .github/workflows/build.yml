@@ -56,7 +56,7 @@ jobs:
           echo "organization=$(echo '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]')" >> $GITHUB_OUTPUT
           echo "repository_name=$(echo '${{ github.event.repository.name }}' | tr '[:upper:]' '[:lower:]')" >> $GITHUB_OUTPUT
 
-  build:
+  build-docker-container:
     runs-on: ubuntu-latest
     needs:
       - prerequisites 
@@ -100,7 +100,7 @@ jobs:
     runs-on: ubuntu-latest
     needs:
       - prerequisites
-      - build
+      - build-docker-container
     steps:
       - name: Checkout
         uses: actions/checkout@v6
