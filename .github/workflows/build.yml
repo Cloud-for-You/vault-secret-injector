@@ -110,6 +110,8 @@ jobs:
             ${{ inputs.OCI_REGISTRY_URL }}/${{ needs.vars.outputs.organization }}/${{ needs.vars.outputs.repository_name }}
           tags: |
             ${{ inputs.VERSION }}
+          labels: |
+              quay.expires-after=183d
       - name: Login to QUAY.IO
         uses: docker/login-action@v2
         with:
@@ -127,8 +129,6 @@ jobs:
             darwin/arm64
           push: true
           tags: ${{ steps.meta.outputs.tags }}
-          labels:
-            ${{ steps.meta.outputs.labels }}
-            quay.expires-after=20h
+          labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=local,src=/tmp/.buildx-cache
           cache-to: type=gha,mode=max
