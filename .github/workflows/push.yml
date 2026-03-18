@@ -1,0 +1,27 @@
+name: Build Develop
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - feat/**
+      - fix/**
+
+jobs:
+  debug:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Dump github context (pretty)
+        run: |
+          echo '${{ toJson(github) }}' | jq .
+
+  unit-tests:
+    uses: ./.github/workflows/_golang_unit-tests.yml
+
+  build:
+    uses: ./.github/workflows/_build.yml
+    with:
+      expired: true
+    secrets:
+      OCI_REGISTRY_USERNAME: ${{ secrets.QUAY_USERNAME }}
+      OCI_REGISTRY_PASSWORD: ${{ secrets.QUAY_TOKEN }}
