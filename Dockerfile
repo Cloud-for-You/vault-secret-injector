@@ -11,7 +11,6 @@ RUN CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -ldflags="-X ma
 
 # Build distroless container from binary
 FROM --platform=${BUILDPLATFORM:-linux/amd64} gcr.io/distroless/static:nonroot
-LABEL org.opencontainers.image.source="https://github.com/Cloud-for-You/vault-secret-injector"
 WORKDIR /
 COPY --from=builder /src/manager /
 ENTRYPOINT ["/manager"]
