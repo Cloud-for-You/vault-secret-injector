@@ -13,6 +13,8 @@ on:
 jobs:
   build:
     uses: ./.github/workflows/build.yml
+    with:
+      expired: true
     secrets:
       OCI_REGISTRY_USERNAME: ${{ secrets.QUAY_USERNAME }}
       OCI_REGISTRY_PASSWORD: ${{ secrets.QUAY_TOKEN }}

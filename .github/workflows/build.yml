@@ -2,12 +2,22 @@ name: Build application and create docker-container
 on:
   workflow_call:
     inputs:
-      VERSION:
+      expired:
+        description: 'Artefact is expired'
+        type: boolean
+        required: false
+        default: false
+      expire_duration:
+        description: 'Duration time for expired artefact'
+        type: string
+        required: false
+        default: '14d'
+      version:
         description: 'Build version'
         type: string
         required: false
         default: build-${{ github.run_id }} 
-      OCI_REGISTRY_URL:
+      oci_registry_url:
         description: 'URL for OCI registry'
         type: string
         required: false
@@ -39,29 +49,12 @@ jobs:
     outputs:
       organization: ${{ steps.set-vars.outputs.organization }}
       repository_name: ${{ steps.set-vars.outputs.repository_name }}
-      extra_labels: ${{ steps.labels.outputs.extra_labels }}
     steps:
       - name: Set new variables
         id: set-vars
         run: |
           echo "organization=$(echo '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]')" >> $GITHUB_OUTPUT
           echo "repository_name=$(echo '${{ github.event.repository.name }}' | tr '[:upper:]' '[:lower:]')" >> $GITHUB_OUTPUT
-      - name: Check if VERSION is semver
-        id: semver
-        run: |
-          if [[ "${{ inputs.VERSION }}" =~ ^v?[0-9]+\.[0-9]+\.[0-9]+(-.*)?$ ]]; then
-            echo "is_semver=true" >> $GITHUB_OUTPUT
-          else
-            echo "is_semver=false" >> $GITHUB_OUTPUT
-          fi
-      - name: Prepare labels
-        id: labels
-        run: |
-          if [[ "${{ steps.semver.outputs.is_semver }}" == "true" ]]; then
-            echo "extra_labels=" >> $GITHUB_OUTPUT
-          else
-            echo "extra_labels=quay.expires-after=183d" >> $GITHUB_OUTPUT
-          fi
 
   build:
     runs-on: ubuntu-latest
@@ -124,15 +117,13 @@ jobs:
         uses: docker/metadata-action@v6
         with:
           images: |
-            ${{ inputs.OCI_REGISTRY_URL }}/${{ needs.prerequisites.outputs.organization }}/${{ needs.prerequisites.outputs.repository_name }}
+            ${{ inputs.oci_registry_url }}/${{ needs.prerequisites.outputs.organization }}/${{ needs.prerequisites.outputs.repository_name }}
           tags: |
-            ${{ inputs.VERSION }}
-          labels: |
-             ${{ needs.prerequisites.outputs.extra_labels }}
+            ${{ inputs.version }}
       - name: Login to QUAY.IO
         uses: docker/login-action@v2
         with:
-          registry: ${{ inputs.OCI_REGISTRY_URL }}
+          registry: ${{ inputs.oci_registry_url }}
           username: ${{ secrets.OCI_REGISTRY_USERNAME }}
           password: ${{ secrets.OCI_REGISTRY_PASSWORD }}
       - name: Build and push
@@ -149,3 +140,49 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=local,src=/tmp/.buildx-cache
           cache-to: type=gha,mode=max
+      - name: Set container expiration in Quay.io
+        if: ${{ inputs.expired == 'true' && inputs.OCI_REGISTRY_URL == 'quay.io' }}
+        env:
+          QUAY_TOKEN: ${{ secrets.QUAY_TOKEN }}
+          ORG: ${{ needs.vars.outputs.organization }}
+          REPO: ${{ needs.vars.outputs.repository_name }}
+          TAG: ${{ inputs.VERSION }}
+          EXPIRE: ${{ inputs.expire_duration }}
+        run: |
+          echo "Input expire duration: $EXPIRE"
+
+          # převod na sekundy
+          if [[ "$EXPIRE" =~ ^([0-9]+)d$ ]]; then
+            SECONDS=$((${BASH_REMATCH[1]} * 86400))
+          elif [[ "$EXPIRE" =~ ^([0-9]+)h$ ]]; then
+            SECONDS=$((${BASH_REMATCH[1]} * 3600))
+          elif [[ "$EXPIRE" =~ ^([0-9]+)m$ ]]; then
+            SECONDS=$((${BASH_REMATCH[1]} * 60))
+          else
+            echo "Unsupported expire format: $EXPIRE"
+            exit 1
+          fi
+      
+          echo "Expiration in seconds: $SECONDS"
+      
+          DIGEST=$(curl -s -H "Authorization: Bearer $QUAY_TOKEN" \
+            "https://quay.io/api/v1/repository/$ORG/$REPO/tag/?specificTag=$TAG" \
+            | jq -r '.tags[0].manifest_digest')
+      
+          echo "Digest: $DIGEST"
+      
+          if [[ -z "$DIGEST" || "$DIGEST" == "null" ]]; then
+            echo "Failed to get manifest digest"
+            exit 1
+          fi
+      
+          curl -s -o /dev/null -w "%{http_code}" -X POST \
+            -H "Authorization: Bearer $QUAY_TOKEN" \
+            -H "Content-Type: application/json" \
+            -d "{\"expiration_seconds\": $SECONDS}" \
+            "https://quay.io/api/v1/repository/$ORG/$REPO/manifest/$DIGEST/expiration/" \
+            | grep -qE "200|201" || { echo "Failed to set expiration"; exit 1; }
+      
+          echo "Expiration set successfully"
+
+          
