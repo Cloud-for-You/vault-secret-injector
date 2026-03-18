@@ -1,0 +1,17 @@
+name: Unit testing for Go project
+on:
+  workflow_call:
+
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+
+jobs:
+  linting:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Setup Go
+        run: |
+          echo "Nastaveni GO"
+

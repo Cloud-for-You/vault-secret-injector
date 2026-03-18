@@ -11,7 +11,19 @@ on:
       - main
 
 jobs:
+  debug:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Dump github context (pretty)
+        run: |
+          echo '${{ toJson(github) }}' | jq .
+
+  unit-tests:
+    uses: ./.github/workflows/golang_unit-tests.yml
+
   build:
+    needs:
+      - unit-tests
     uses: ./.github/workflows/build.yml
     with:
       expired: true

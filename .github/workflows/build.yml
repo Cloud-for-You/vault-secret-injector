@@ -42,13 +42,6 @@ permissions:
   issues: write
 
 jobs:
-  debug:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Dump github context (pretty)
-        run: |
-          echo '${{ toJson(github) }}' | jq .
-
   prerequisites:
     runs-on: ubuntu-latest
     outputs:
