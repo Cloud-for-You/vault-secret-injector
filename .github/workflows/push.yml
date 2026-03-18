@@ -16,10 +16,10 @@ jobs:
           echo '${{ toJson(github) }}' | jq .
 
   unit-tests:
-    uses: ./.github/_golang_unit-tests.yml
+    uses: .github/_golang_unit-tests.yml
 
   build:
-    uses: ./.github/_build.yml
+    uses: .github/_build.yml
     with:
       expired: true
     secrets:
