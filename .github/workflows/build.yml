@@ -137,7 +137,7 @@ jobs:
         uses: docker/build-push-action@v7
         with:
           context: .
-          platforms: ${{ needs.prerequisites.outputs.platforms }}
+          platforms: ${{ inputs.platforms }}
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
