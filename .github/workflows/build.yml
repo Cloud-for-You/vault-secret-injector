@@ -1,0 +1,11 @@
+Name: Build GO application
+
+on:
+  workflow_call:
+
+jobs:
+  build-container:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        run: echo "Checkout repo"

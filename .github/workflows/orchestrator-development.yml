@@ -1,0 +1,24 @@
+name: CI pipeline - Develop
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - feat/**
+      - fix/**
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  build:
+    uses: ./.github/workflows/build.yml
+
+#  test:
+#    needs: build
+#    uses: ./.github/workflows/test.yml
+
+#  release:
+#    if: github.ref == 'refs/heads/main'
+#    needs: test
+#    uses: ./.github/workflows/release.yml
