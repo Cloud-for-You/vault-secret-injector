@@ -1,5 +1,3 @@
-Name: Build GO application
-
 on:
   workflow_call:
 
