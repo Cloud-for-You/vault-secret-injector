@@ -143,3 +143,4 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=local,src=/tmp/${{ needs.prerequisites.outputs.repository_name }}-cache-${{ github.run_id }}
           cache-to: type=gha,mode=max
+          provenance: false
