@@ -138,51 +138,5 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=local,src=/tmp/.buildx-cache
+          cache-from: type=local,src=/tmp/${{ needs.prerequisites.outputs.repository_name }}-cache-${{ github.run_id }}
           cache-to: type=gha,mode=max
-      - name: Set container expiration in Quay.io
-        if: ${{ inputs.expired && inputs.oci_registry_url == 'quay.io' }}
-        env:
-          QUAY_TOKEN: ${{ secrets.OCI_REGISTRY_PASSWORD }}
-          ORG: ${{ needs.prerequisites.outputs.organization }}
-          REPO: ${{ needs.prerequisites.outputs.repository_name }}
-          TAG: ${{ inputs.version }}
-          EXPIRE: ${{ inputs.expire_duration }}
-        run: |
-          echo "Input expire duration: $EXPIRE"
-
-          # převod na sekundy
-          if [[ "$EXPIRE" =~ ^([0-9]+)d$ ]]; then
-            SECONDS=$((${BASH_REMATCH[1]} * 86400))
-          elif [[ "$EXPIRE" =~ ^([0-9]+)h$ ]]; then
-            SECONDS=$((${BASH_REMATCH[1]} * 3600))
-          elif [[ "$EXPIRE" =~ ^([0-9]+)m$ ]]; then
-            SECONDS=$((${BASH_REMATCH[1]} * 60))
-          else
-            echo "Unsupported expire format: $EXPIRE"
-            exit 1
-          fi
-      
-          echo "Expiration in seconds: $SECONDS"
-      
-          DIGEST=$(curl -s -H "Authorization: Bearer $QUAY_TOKEN" \
-            "https://quay.io/api/v1/repository/$ORG/$REPO/tag/?specificTag=$TAG" \
-            | jq -r '.tags[0].manifest_digest')
-      
-          echo "Digest: $DIGEST"
-      
-          if [[ -z "$DIGEST" || "$DIGEST" == "null" ]]; then
-            echo "Failed to get manifest digest"
-            exit 1
-          fi
-      
-          curl -s -o /dev/null -w "%{http_code}" -X PUT \
-            -H "Authorization: Bearer $QUAY_TOKEN" \
-            -H "Content-Type: application/json" \
-            -d "{\"expiration\": $SECONDS}" \
-            "https://quay.io/api/v1/repository/$ORG/$REPO/tag/$TAG" \
-            | grep -qE "200|201" || { echo "Failed to set expiration"; exit 1; }
-      
-          echo "Expiration set successfully"
-
-          
