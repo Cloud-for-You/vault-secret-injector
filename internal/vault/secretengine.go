@@ -30,6 +30,9 @@ func CreateOrUpdateSecretEngineKV(ctx *k8siov1.Namespace, client *vaultapi.Clien
 
 	mountInput := &vaultapi.MountInput{
 		Type: "kv",
+		Description: fmt.Sprintf(
+			"Managed KV v2 (project=%s;owner=vault-secret-injector-webhook;purpose=secrets;lifecycle=managed)", ctx.GetName(),
+		),
 		Options: map[string]string{
 			"version": "2",
 		},
