@@ -141,7 +141,7 @@ jobs:
           cache-from: type=local,src=/tmp/.buildx-cache
           cache-to: type=gha,mode=max
       - name: Set container expiration in Quay.io
-        if: ${{ inputs.expired == 'true' && inputs.oci_registry_url == 'quay.io' }}
+        if: ${{ inputs.expired && inputs.oci_registry_url == 'quay.io' }}
         env:
           QUAY_TOKEN: ${{ secrets.QUAY_TOKEN }}
           ORG: ${{ needs.vars.outputs.organization }}
