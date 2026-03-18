@@ -104,7 +104,7 @@ jobs:
           path: /tmp/${{ needs.vars.outputs.repository_name }}-cache
       - name: Docker meta
         id: meta
-        uses: docker/metadata-action@v5
+        uses: docker/metadata-action@v6
         with:
           images: |
             ${{ inputs.OCI_REGISTRY_URL }}/${{ needs.vars.outputs.organization }}/${{ needs.vars.outputs.repository_name }}
@@ -127,6 +127,8 @@ jobs:
             darwin/arm64
           push: true
           tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
+          labels:
+            ${{ steps.meta.outputs.labels }}
+            quay.expires-after=20h
           cache-from: type=local,src=/tmp/.buildx-cache
           cache-to: type=gha,mode=max
