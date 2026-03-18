@@ -2,6 +2,11 @@ name: Build application and create docker-container
 on:
   workflow_call:
     inputs:
+      platforms:
+        description: 'Platform to build'
+        type: string
+        required: false
+        default: '["linux/amd64"]'
       expired:
         description: 'Artefact is expired'
         type: boolean
@@ -62,8 +67,8 @@ jobs:
       - prerequisites 
     strategy:
       matrix:
-        platform:
-          - linux/amd64
+        platform: ${{ fromJson(inputs.platforms) }}
+#          - linux/amd64
 #          - linux/arm64
 #          - darwin/amd64
 #          - darwin/arm64
@@ -130,11 +135,12 @@ jobs:
         uses: docker/build-push-action@v7
         with:
           context: .
-          platforms: |
-            linux/amd64
-            linux/arm64
-            darwin/amd64
-            darwin/arm64
+          platforms: ${{ inputs.platforms }}
+#          platforms: |
+#            linux/amd64
+#            linux/arm64
+#            darwin/amd64
+#            darwin/arm64
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
