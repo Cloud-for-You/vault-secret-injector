@@ -141,7 +141,6 @@ jobs:
           cache-from: type=local,src=/tmp/.buildx-cache
           cache-to: type=gha,mode=max
       - name: Set container expiration in Quay.io
-        if: ${{ inputs.expired }}
         env:
           QUAY_TOKEN: ${{ secrets.OCI_REGISTRY_PASSWORD }}
           ORG: ${{ needs.prerequisites.outputs.organization }}
