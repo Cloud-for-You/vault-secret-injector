@@ -55,12 +55,17 @@ jobs:
     outputs:
       organization: ${{ steps.set-vars.outputs.organization }}
       repository_name: ${{ steps.set-vars.outputs.repository_name }}
+      platforms: ${{ steps.set-platforms.outputs.platforms }}
     steps:
       - name: Set new variables
         id: set-vars
         run: |
           echo "organization=$(echo '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]')" >> $GITHUB_OUTPUT
           echo "repository_name=$(echo '${{ github.event.repository.name }}' | tr '[:upper:]' '[:lower:]')" >> $GITHUB_OUTPUT
+      - name: Set platforms
+        id: set-platforms
+        run: |
+          echo "platforms=$(echo '${{ inputs.platforms }}' | jq -R 'split(",")' | jq -c)" >> $GITHUB_OUTPUT
 
   build-docker-container:
     runs-on: ubuntu-latest
@@ -68,7 +73,7 @@ jobs:
       - prerequisites 
     strategy:
       matrix:
-        platform: ${{ split(inputs.platforms, ',') }}
+        platform: ${{ fromJson(needs.prerequisites.outputs.platforms) }}
 #          - linux/amd64
 #          - linux/arm64
 #          - darwin/amd64
