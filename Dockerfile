@@ -10,7 +10,7 @@ RUN go mod download
 RUN CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -ldflags="-X main.Commit=$(git rev-parse HEAD)" -a -o manager cmd/main.go
 
 # Build distroless container from binary
-FROM --platform=${BUILDPLATFORM:-linux/amd64} gcr.io/distroless/static:nonroot
+FROM gcr.io/distroless/static:nonroot
 WORKDIR /
 COPY --from=builder /src/manager /
 ENTRYPOINT ["/manager"]
