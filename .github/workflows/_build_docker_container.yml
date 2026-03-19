@@ -49,20 +49,14 @@ jobs:
         uses: docker/setup-qemu-action@v4
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v4
-      - name: Set cache name
-        id: cache-name
-        run: |
-          cache_name="${{ needs.setup.outputs.project-name }}-cache-${{ matrix.platform }}-${{ github.run_id }}"
-          cache_name="${cache_name//\//-}"
-          echo "cache-name=${cache_name}" >> $GITHUB_OUTPUT
       - name: Build and push
         uses: docker/build-push-action@v7
         with:
           context: .
           platforms: ${{ matrix.platform }}
           tags: ${{ needs.setup.outputs.project-name }}:${{ github.sha }}
-          cache-from: type=gha
-          cache-to: type=local,dest=/tmp/${{ needs.setup.outputs.project-name }}-cache-${{ github.run_id }},mode=max
+          push: false
+          load: true
       - name: Upload cache
         id: upload-artifacts
         uses: actions/upload-artifact@v7
