@@ -41,6 +41,11 @@ jobs:
     outputs:
       artifact-id: ${{ steps.upload-artifacts.outputs.artifact-id }}
     steps:
+      - name: Setup
+        id: setup
+        run: |
+          echo "platform_os=$(echo ${{ matrix.platform }} |  cut -d '/' -f1)" >> $GITHUB_OUTPUT
+          echo "platform_arch=$(echo ${{ matrix.platform }} |  cut -d '/' -f2)" >> $GITHUB_OUTPUT
       - name: Checkout
         uses: actions/checkout@v6
         with:
@@ -56,12 +61,12 @@ jobs:
           platforms: ${{ matrix.platform }}
           tags: ${{ needs.setup.outputs.project-name }}:${{ github.sha }}
           cache-from: type=gha
-          cache-to: type=local,dest=/tmp/${{ needs.setup.outputs.project-name }}-cache-${{ github.run_id }},mode=max
+          cache-to: type=local,dest=/tmp/${{ needs.setup.outputs.project-name }},mode=max
       - name: Upload cache
         id: upload-artifacts
         uses: actions/upload-artifact@v7
         with:
-          name: ${{ steps.cache-name.outputs.cache-name }}
-          path: /tmp/${{ needs.setup.outputs.project-name }}-cache-${{ github.run_id }}
+          name: ${{ needs.setup.outputs.project-name }}-${{ step.setup.outputs.platform_os }}-${{ step.setup.outputs.platform_arch }}
+          path: /tmp/${{ needs.setup.outputs.project-name }}
           if-no-files-found: error
           retention-days: 1
