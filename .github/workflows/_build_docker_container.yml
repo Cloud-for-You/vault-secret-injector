@@ -22,16 +22,14 @@ jobs:
   setup:
     runs-on: ubuntu-latest
     outputs:
-      organization: ${{ steps.set-vars.outputs.organization }}
-      repository_name: ${{ steps.set-vars.outputs.repository_name }}
-      platforms: ${{ steps.set-platforms.outputs.platforms }}
+      project-name: ${{ steps.set-variables.outputs.project_name }}
+      matrix-platforms: ${{ steps.set-variables.outputs.matrix_platforms }}
     steps:
       - name: Set new variables
         id: set-variables
         run: |
-          echo "organization=$(echo '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]')" >> $GITHUB_OUTPUT
           echo "project_name=$(echo '${{ github.event.repository.name }}' | tr '[:upper:]' '[:lower:]')" >> $GITHUB_OUTPUT
-          echo "matrix_platforms=$(echo '${{ inputs.PLATFORMS }}' | jq -R 'split(",")' | jq -c)" >> $GITHUB_OUTPUT
+          echo "matrix_platforms=$(echo \"${{ inputs.PLATFORMS }}\" | jq -R 'split(",")' | jq -c)" >> $GITHUB_OUTPUT
 
   build-docker-container:
     runs-on: ubuntu-latest
@@ -39,7 +37,7 @@ jobs:
       - setup
     strategy:
       matrix:
-        platform: ${{ needs.setup.outputs.matrix_platforms }}
+        platform: ${{ needs.setup.outputs.matrix-platforms }}
     outputs:
       artifact-id: ${{ steps.upload-artifacts.outputs.artifact-id }}
     steps:
@@ -54,20 +52,20 @@ jobs:
       - name: Set cache name
         id: cache-name
         run: |
-          echo "cache-name=${{ needs.setup.outputs.project_name }}-cache-${{ matrix.platform }}-${{ github.run_id }}" | sed 's:/:-:g' >> $GITHUB_OUTPUT
+          echo "cache-name=${{ needs.setup.outputs.project-name }}-cache-${{ matrix.platform }}-${{ github.run_id }}" | sed 's:/:-:g' >> $GITHUB_OUTPUT
       - name: Build and push
         uses: docker/build-push-action@v7
         with:
           context: .
           platforms: ${{ matrix.platform }}
-          tags: ${{ needs.setup.outputs.rproject_name }}:${{ github.sha }}
+          tags: ${{ needs.setup.outputs.project-name }}:${{ github.sha }}
           cache-from: type=gha
-          cache-to: type=local,dest=/tmp/${{ needs.setup.outputs.project_name }}-cache-${{ github.run_id }},mode=max
+          cache-to: type=local,dest=/tmp/${{ needs.setup.outputs.project-name }}-cache-${{ github.run_id }},mode=max
       - name: Upload cache
         id: upload-artifacts
         uses: actions/upload-artifact@v7
         with:
           name: ${{ steps.cache-name.outputs.cache-name }}
-          path: /tmp/${{ needs.setup.outputs.project_name }}-cache-${{ github.run_id }}
+          path: /tmp/${{ needs.setup.outputs.project-name }}-cache-${{ github.run_id }}
           if-no-files-found: error
           retention-days: 1
