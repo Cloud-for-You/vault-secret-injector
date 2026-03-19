@@ -61,5 +61,5 @@ jobs:
         uses: actions/setup-go@v6
         with:
           go-version: ${{ matrix.module.go }}  
-      - name: generate test coverage
+      - name: Run testing scenarios 
         run: make test 
