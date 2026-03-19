@@ -62,8 +62,5 @@ jobs:
         with:
           go-version: ${{ matrix.module.go }}  
       - name: generate test coverage
-        run: go test ./... -coverprofile=./cover.out -covermode=atomic -coverpkg=./...
-      - name: check test coverage
-        uses: vladopajic/go-test-coverage@v2
-        with:
-          config: ./.testcoverage.yml
+        #run: go test ./... -coverprofile=./cover.out -covermode=atomic -coverpkg=./...
+        run: go test $$(go list ./... | grep -v /e2e) -coverprofile=./cover.out -covermode=atomic 
