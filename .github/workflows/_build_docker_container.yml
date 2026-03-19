@@ -29,7 +29,7 @@ jobs:
         id: set-variables
         run: |
           echo "project_name=$(echo '${{ github.event.repository.name }}' | tr '[:upper:]' '[:lower:]')" >> $GITHUB_OUTPUT
-          echo "matrix_platforms=$(echo \"${{ inputs.PLATFORMS }}\" | jq -R 'split(",")' | jq -c)" >> $GITHUB_OUTPUT
+          echo "matrix_platforms=$(echo -n "${{ inputs.PLATFORMS }}" | jq -csR '. | split(",")')" >> $GITHUB_OUTPUT
 
   build-docker-container:
     runs-on: ubuntu-latest
