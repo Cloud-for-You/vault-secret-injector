@@ -1,0 +1,65 @@
+name: Unit testing for Go project
+on:
+  workflow_call:
+    inputs:
+      os:
+        description: 'Runs on OS system'
+        type: string
+        required: false
+        default: 'ubuntu-latest'
+
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+
+jobs:
+  detect-go:
+    runs-on: ${{ inputs.os }}
+    outputs:
+      matrix: ${{ steps.set-modules.outputs.matrix }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+      - name: Setup Go
+        uses: actions/setup-go@v6
+      - name: Read modules and Go version
+        id: set-modules
+        run: |
+          echo "matrix=$(go list -m -json | jq -s '.' | jq -c '[.[] | {dir: .Dir, go: .GoVersion}]')" >> $GITHUB_OUTPUT
+
+  golangci-lint:
+    runs-on: ${{ inputs.os }} 
+    needs: detect-go
+    strategy:
+      matrix:
+        module: ${{ fromJson(needs.detect-go.outputs.matrix) }}
+  
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+      - name: Setup Go
+        uses: actions/setup-go@v6
+        with:
+          go-version: ${{ matrix.module.go }}
+      - name: golangci-lint
+        uses: golangci/golangci-lint-action@v9
+        with:
+          working-directory: ${{ matrix.module.dir }}
+
+  golang-test-coverage:
+    runs-on: ${{ inputs.os }}
+    needs: detect-go
+    strategy:
+      matrix:
+        module: ${{ fromJson(needs.detect-go.outputs.matrix) }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+      - name: Setup Go
+        uses: actions/setup-go@v6
+        with:
+          go-version: ${{ matrix.module.go }}  
+      - name: generate test coverage
+        run: make test 
