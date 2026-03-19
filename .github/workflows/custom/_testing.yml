@@ -18,21 +18,7 @@ permissions:
   issues: write
 
 jobs:
-  detect-go:
-    runs-on: ${{ inputs.os }}
-    outputs:
-      matrix: ${{ steps.set-modules.outputs.matrix }}
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v6
-      - name: Setup Go
-        uses: actions/setup-go@v6
-      - name: Read modules and Go version
-        id: set-modules
-        run: |
-          echo "matrix=$(go list -m -json | jq -s '.' | jq -c '[.[] | {dir: .Dir, go: .GoVersion}]')" >> $GITHUB_OUTPUT
-
-  golangci-lint:
+  linting:
     runs-on: ${{ inputs.os }} 
     needs: detect-go
     strategy:
@@ -45,25 +31,21 @@ jobs:
       - name: Setup Go
         uses: actions/setup-go@v6
         with:
-          go-version: ${{ matrix.module.go }}
+          go-version: ${{ inputs.go-version }}
       - name: golangci-lint
         uses: golangci/golangci-lint-action@v9
-        with:
-          working-directory: ${{ matrix.module.dir }}
+        run: |
+          make lint
 
-  golang-test-coverage:
+  testing:
     runs-on: ${{ inputs.os }}
-    needs: detect-go
-    strategy:
-      matrix:
-        module: ${{ fromJson(needs.detect-go.outputs.matrix) }}
-
     steps:
       - name: Checkout
         uses: actions/checkout@v6
       - name: Setup Go
         uses: actions/setup-go@v6
         with:
-          go-version: ${{ matrix.module.go }}  
+          go-version: ${{ inputs.go-version }}  
       - name: Run testing scenarios 
-        run: make test 
+        run: |
+          make test 
