@@ -62,6 +62,8 @@ jobs:
           tags: ${{ needs.setup.outputs.project-name }}:${{ github.sha }}
           cache-from: type=gha
           cache-to: type=local,dest=/tmp/${{ needs.setup.outputs.project-name }},mode=max
+          push: false
+          load: true
       - name: Vulnerability scan
         uses: aquasecurity/trivy-action@0.35.0
         with:
