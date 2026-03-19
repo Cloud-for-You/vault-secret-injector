@@ -7,6 +7,10 @@ on:
         type: string
         required: false
         default: 'ubuntu-latest'
+      go-version:
+        description: 'Go version'
+        type: string
+        required: true
 
 permissions:
   contents: write
