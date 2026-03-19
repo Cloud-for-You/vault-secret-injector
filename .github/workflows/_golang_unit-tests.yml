@@ -17,16 +17,16 @@ jobs:
   detect-go:
     runs-on: ${{ inputs.os }}
     outputs:
-      modules: ${{ steps.set-modules.outputs.modules }}
+      matrix: ${{ steps.set-modules.outputs.matrix }}
     steps:
       - name: Checkout
         uses: actions/checkout@v6
       - name: Setup Go
         uses: actions/setup-go@v6
-      - name: Read modules and Go version 
+      - name: Read modules and Go version
         id: set-modules
         run: |
-          echo "matrix=$(go list -m -json | jq -s '.' | jq -c '[.[] | {dir: .Dir, go-version: .GoVersion}]')" >> $GITHUB_OUTPUT
+          echo "matrix=$(go list -m -json | jq -s '.' | jq -c '[.[] | {dir: .Dir, go: .GoVersion}]')" >> $GITHUB_OUTPUT
 
   golangci-lint:
     runs-on: ${{ inputs.os }} 
@@ -34,14 +34,15 @@ jobs:
     strategy:
       matrix:
         module: ${{ fromJson(needs.detect-go.outputs.matrix) }}
+  
     steps:
       - name: Checkout
         uses: actions/checkout@v6
       - name: Setup Go
         uses: actions/setup-go@v6
         with:
-          go-version: ${{ matrix.module.go-version }}
-      - name: golangci-lint ${{ matrix.modules.dir }}
+          go-version: ${{ matrix.module.go }}
+      - name: golangci-lint
         uses: golangci/golangci-lint-action@v9
         with:
-          working-directory: ${{ matrix.modules.dir }}
+          working-directory: ${{ matrix.module.dir }}
