@@ -6,7 +6,7 @@ on:
         description: 'Comma separated list of target for builds'
         type: string
         required: false
-        default: 'linux/amd64,linux/arm64,darwin/arm64'
+        default: 'linux/amd64,linux/arm64'
     outputs:
       artifact-id:
         description: "Build artifact"
