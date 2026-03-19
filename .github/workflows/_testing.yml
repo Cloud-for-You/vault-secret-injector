@@ -47,4 +47,6 @@ jobs:
           go-version: ${{ inputs.go-version }}  
       - name: Run testing scenarios 
         run: |
+          make setup-envtest
+          echo "KUBEBUILDER_ASSETS=$(./bin/setup-envtest use 1.31 --bin-dir ./bin -p path)"
           make test 
