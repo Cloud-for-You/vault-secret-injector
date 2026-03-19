@@ -20,7 +20,6 @@ permissions:
 jobs:
   linting:
     runs-on: ${{ inputs.os }} 
-    needs: detect-go
     strategy:
       matrix:
         module: ${{ fromJson(needs.detect-go.outputs.matrix) }}
