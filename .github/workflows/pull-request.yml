@@ -17,10 +17,10 @@ jobs:
   build-docker-container:
     uses: ./.github/workflows/_build_docker_container.yml
 
-  debug-outputs:
-    runs-on: ubuntu-latest
-    needs:
-      - build-docker-container
-    steps:
-      - run: |
-          echo ${{ needs.build-docker-container.outputs.artifact-id }}
+  #debug-outputs:
+  #  runs-on: ubuntu-latest
+  #  needs:
+  #    - build-docker-container
+  #  steps:
+  #    - run: |
+  #        echo ${{ needs.build-docker-container.outputs.artifact-id }}
