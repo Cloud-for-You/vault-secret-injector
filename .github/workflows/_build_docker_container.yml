@@ -55,8 +55,8 @@ jobs:
           context: .
           platforms: ${{ matrix.platform }}
           tags: ${{ needs.setup.outputs.project-name }}:${{ github.sha }}
-          push: false
-          load: true
+          cache-from: type=gha
+          cache-to: type=local,dest=/tmp/${{ needs.setup.outputs.project-name }}-cache-${{ github.run_id }},mode=max
       - name: Upload cache
         id: upload-artifacts
         uses: actions/upload-artifact@v7
