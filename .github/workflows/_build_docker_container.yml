@@ -1,0 +1,71 @@
+name: Build application and create docker-container
+on:
+  workflow_call:
+    inputs:
+      PLATFORMS:
+        description: 'Comma separated list of target for builds'
+        type: string
+        required: false
+        default: 'linux/amd64,linux/arm64,darwin/arm64'
+    outputs:
+      artifact-id:
+        description: "Build artifact"
+        value: ${{ jobs.build-docker-container.artifact-id }}
+        
+
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+
+jobs:
+  setup:
+    runs-on: ubuntu-latest
+    outputs:
+      organization: ${{ steps.set-vars.outputs.organization }}
+      repository_name: ${{ steps.set-vars.outputs.repository_name }}
+      platforms: ${{ steps.set-platforms.outputs.platforms }}
+    steps:
+      - name: Set new variables
+        id: set-variables
+        run: |
+          echo "organization=$(echo '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]')" >> $GITHUB_OUTPUT
+          echo "project_name=$(echo '${{ github.event.repository.name }}' | tr '[:upper:]' '[:lower:]')" >> $GITHUB_OUTPUT
+          echo "matrix_platforms=$(echo '${{ inputs.PLATFORMS }}' | jq -R 'split(",")' | jq -c)" >> $GITHUB_OUTPUT
+
+  build-docker-container:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        platform: ${{ fromJson(needs.setup.outputs.platforms) }}
+    outputs:
+      artifact-id: ${{ steps.upload-artifacts.outputs.artifact-id }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ github.head_ref }}
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v4
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+      - name: Set cache name
+        id: cache-name
+        run: |
+          echo "cache-name=${{ needs.setup.outputs.project_name }}-cache-${{ matrix.platform }}-${{ github.run_id }}" | sed 's:/:-:g' >> $GITHUB_OUTPUT
+      - name: Build and push
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          platforms: ${{ matrix.platform }}
+          tags: ${{ needs.setup.outputs.rproject_name }}:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=local,dest=/tmp/${{ needs.setup.outputs.project_name }}-cache-${{ github.run_id }},mode=max
+      - name: Upload cache
+        id: upload-artifacts
+        uses: actions/upload-artifact@v7
+        with:
+          name: ${{ steps.cache-name.outputs.cache-name }}
+          path: /tmp/${{ needs.setup.outputs.project_name }}-cache-${{ github.run_id }}
+          if-no-files-found: error
+          retention-days: 1
