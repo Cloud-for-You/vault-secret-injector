@@ -1,6 +1,12 @@
 name: Unit testing for Go project
 on:
   workflow_call:
+    inputs:
+      os:
+        description: 'Runs on OS system'
+        type: string
+        required: false
+        default: 'ubuntu-latest'
 
 permissions:
   contents: write
@@ -23,7 +29,7 @@ jobs:
           echo "matrix=$(go list -m -json | jq -s '.' | jq -c '[.[] | {dir: .Dir, go-version: .GoVersion}]')" >> $GITHUB_OUTPUT
 
   golangci-lint:
-    runs-on: ubuntu-latest
+    runs-on: ${{ inputs.os }} 
     needs: detect-go
     strategy:
       matrix:
