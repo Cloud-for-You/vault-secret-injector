@@ -41,8 +41,8 @@ jobs:
     outputs:
       artifact-id: ${{ steps.upload-artifacts.outputs.artifact-id }}
     steps:
-      - name: Setup
-        id: setup
+      - name: Setup build variables
+        id: setup-build-vars
         run: |
           echo "platform_os=$(echo ${{ matrix.platform }} |  cut -d '/' -f1)" >> $GITHUB_OUTPUT
           echo "platform_arch=$(echo ${{ matrix.platform }} |  cut -d '/' -f2)" >> $GITHUB_OUTPUT
@@ -59,14 +59,14 @@ jobs:
         with:
           context: .
           platforms: ${{ matrix.platform }}
-          tags: ${{ needs.setup.outputs.project-name }}:${{ github.sha }}
+          tags: ${{ needs.setup-build-vars.outputs.project-name }}:${{ github.sha }}
           cache-from: type=gha
-          cache-to: type=local,dest=/tmp/${{ needs.setup.outputs.project-name }},mode=max
+          cache-to: type=local,dest=/tmp/${{ needs.setup-build-vars.outputs.project-name }},mode=max
       - name: Upload cache
         id: upload-artifacts
         uses: actions/upload-artifact@v7
         with:
-          name: ${{ needs.setup.outputs.project-name }}-${{ step.setup.outputs.platform_os }}-${{ step.setup.outputs.platform_arch }}
-          path: /tmp/${{ needs.setup.outputs.project-name }}
+          name: ${{ needs.setup-build-vars.outputs.project-name }}-${{ step.setup-build-vars.outputs.platform_os }}-${{ step.setup-build-vars.outputs.platform_arch }}
+          path: /tmp/${{ needs.setup-build-vars.outputs.project-name }}
           if-no-files-found: error
           retention-days: 1
