@@ -15,9 +15,6 @@ jobs:
         run: |
           echo '${{ toJson(github) }}' | jq .
 
-  unit-tests:
-    uses: ./.github/workflows/_golang_unit-tests.yml
-
   build:
     uses: ./.github/workflows/_build.yml
     with:
