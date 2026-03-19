@@ -39,7 +39,7 @@ jobs:
       - setup
     strategy:
       matrix:
-        platform: ${{ fromJson(needs.setup.outputs.matrix_platforms) }}
+        platform: ${{ needs.setup.outputs.matrix_platforms }}
     outputs:
       artifact-id: ${{ steps.upload-artifacts.outputs.artifact-id }}
     steps:
