@@ -46,3 +46,24 @@ jobs:
         uses: golangci/golangci-lint-action@v9
         with:
           working-directory: ${{ matrix.module.dir }}
+
+  golang-test-coverage:
+    runs-on: ${{ inputs.os }}
+    needs: detect-go
+    strategy:
+      matrix:
+        module: ${{ fromJson(needs.detect-go.outputs.matrix) }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+      - name: Setup Go
+        uses: actions/setup-go@v6
+        with:
+          go-version: ${{ matrix.module.go }}  
+      - name: generate test coverage
+        run: go test ./... -coverprofile=./cover.out -covermode=atomic -coverpkg=./...
+      - name: check test coverage
+        uses: vladopajic/go-test-coverage@v2
+        with:
+          config: ./.testcoverage.yml
