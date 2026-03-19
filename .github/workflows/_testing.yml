@@ -33,7 +33,6 @@ jobs:
         with:
           go-version: ${{ inputs.go-version }}
       - name: golangci-lint
-        uses: golangci/golangci-lint-action@v9
         run: |
           make lint
 
