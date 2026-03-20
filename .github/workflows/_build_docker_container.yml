@@ -94,6 +94,13 @@ jobs:
         with:
           pattern: '*-container'
           path: /tmp/${{ needs.setup.outputs.project-name }}-container
+      - name: Load docker images
+        run: |
+          find /tmp -type f
+          for dir in /tmp/${{ needs.setup.outputs.project-name }}-container/*/; do
+            docker buildx load --input "$dir"
+          done
+          docker images
       - name: Vulnerability scan in table
         uses: aquasecurity/trivy-action@0.35.0
         with:
