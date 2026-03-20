@@ -97,7 +97,7 @@ jobs:
       - name: Load docker images
         run: |
           for dir in /tmp/${{ needs.setup.outputs.project-name }}-container/*/; do
-            docker buildx load --input "$dir"
+            docker buildx load "$dir"
           done
           docker images
       - name: Vulnerability scan in table
