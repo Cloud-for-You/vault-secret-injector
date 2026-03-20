@@ -70,14 +70,18 @@ jobs:
           scan-type: image
           image-ref: ${{ needs.setup.outputs.project-name }}:${{ github.sha }}
           format: "cosign-vuln"
-          output: /tmp/${{ needs.setup.outputs.project-name }}-${{ steps.platform-vars.outputs.platform_os }}-${{ steps.platform-vars.outputs.platform_arch }}-cosignvuln.json
+          output: /tmp/${{ needs.setup.outputs.project-name }}-${{ steps.platform-vars.outputs.platform_os }}-${{ steps.platform-vars.outputs.platform_arch }}-cosignvuln
       - name: SBOM generator
         uses: aquasecurity/trivy-action@0.35.0
         with:
           scan-type: image
           image-ref: ${{ needs.setup.outputs.project-name }}:${{ github.sha }}
-          format: "spdx-json"
-          output: /tmp/${{ needs.setup.outputs.project-name }}-${{ steps.platform-vars.outputs.platform_os }}-${{ steps.platform-vars.outputs.platform_arch }}-spdxjson.json
+          format: "sarif"
+          output: /tmp/${{ needs.setup.outputs.project-name }}-${{ steps.platform-vars.outputs.platform_os }}-${{ steps.platform-vars.outputs.platform_arch }}-sarif
+      - name: Save vulnerability summary
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: /tmp/${{ needs.setup.outputs.project-name }}-${{ steps.platform-vars.outputs.platform_os }}-${{ steps.platform-vars.outputs.platform_arch }}-sarif
       - name: Upload cache
         id: upload-artifacts
         uses: actions/upload-artifact@v7
@@ -85,7 +89,7 @@ jobs:
           name: ${{ needs.setup.outputs.project-name }}-${{ steps.platform-vars.outputs.platform_os }}-${{ steps.platform-vars.outputs.platform_arch }}
           #path: /tmp/${{ needs.setup.outputs.project-name }}
           path: |
-            /tmp/${{ needs.setup.outputs.project-name }}-${{ steps.platform-vars.outputs.platform_os }}-${{ steps.platform-vars.outputs.platform_arch }}-cosignvuln.json
-            /tmp/${{ needs.setup.outputs.project-name }}-${{ steps.platform-vars.outputs.platform_os }}-${{ steps.platform-vars.outputs.platform_arch }}-spdxjson.json 
+            /tmp/${{ needs.setup.outputs.project-name }}-${{ steps.platform-vars.outputs.platform_os }}-${{ steps.platform-vars.outputs.platform_arch }}-cosignvuln
+            /tmp/${{ needs.setup.outputs.project-name }}-${{ steps.platform-vars.outputs.platform_os }}-${{ steps.platform-vars.outputs.platform_arch }}-sarif
           if-no-files-found: error
           retention-days: 1
