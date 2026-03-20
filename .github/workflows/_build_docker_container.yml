@@ -90,8 +90,9 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v4
       - name: Download cache artifact
-        uses: actions/download-artifact@v7
+        uses: actions/download-artifact@v8
         with:
+          pattern: '*-container'
           path: /tmp/${{ needs.setup.outputs.project-name }}-container
       - name: Vulnerability scan in table
         uses: aquasecurity/trivy-action@0.35.0
