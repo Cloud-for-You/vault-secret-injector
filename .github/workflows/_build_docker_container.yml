@@ -67,14 +67,20 @@ jobs:
           #cache-to: type=local,dest=/tmp/${{ needs.setup.outputs.project-name }},mode=max
           push: false
           load: true
-      - name: Vulnerability scan
+      - name: Vulnerability scan in table
+        uses: aquasecurity/trivy-action@0.35.0
+        with:
+          scan-type: image
+          image-ref: ${{ needs.setup.outputs.project-name }}:${{ github.sha }}
+          format: "table"
+      - name: Vulnerability scan cosign-vuln
         uses: aquasecurity/trivy-action@0.35.0
         with:
           scan-type: image
           image-ref: ${{ needs.setup.outputs.project-name }}:${{ github.sha }}
           format: "cosign-vuln"
           output: /tmp/${{ needs.setup.outputs.project-name }}-${{ steps.platform-vars.outputs.platform_os }}-${{ steps.platform-vars.outputs.platform_arch }}-cosignvuln
-      - name: SBOM generator
+      - name: SARIF generator
         uses: aquasecurity/trivy-action@0.35.0
         with:
           scan-type: image
